@@ -16,16 +16,15 @@
 在 Xcode 中新增檔案時，請確保右側 Inspector 面板的 `Target Membership` 設定正確，否則將導致編譯失敗或找不到資源：
 
 ```text
-SandboxScience/
-├── visionOS/
-│   ├── SandboxScience/
-│   │   ├── SharedTypes.h           # Target: 不需勾選 (C 標頭檔，由 Metal 與 Swift 橋接引用)
-│   │   ├── ParticleCompute.metal   # Target: ✅ 勾選 SandboxScience (確保編譯入 GPU default.metallib)
-│   │   ├── ParticleSimulator.swift # Target: ✅ 勾選 SandboxScience
-│   │   ├── ImmersiveView.swift     # Target: ✅ 勾選 SandboxScience
-│   │   └── Info.plist              # Target: 不需勾選 (於 Target 的 Build Settings 中綁定)
-│   └── README.md                   # Target: 不需勾選 (說明文件)
-└── (其他主專案檔案...)
+ParticleVision/
+├── Simulation/
+│   ├── SharedTypes.h               # Target: 不需勾選 (C 標頭檔，由 Metal 與 Swift 橋接引用)
+│   ├── ParticleCompute.metal       # Target: ✅ 勾選 particle-vision (確保編譯入 GPU default.metallib)
+│   └── ParticleSimulator.swift     # Target: ✅ 勾選 particle-vision
+├── particle-vision/
+│   ├── ImmersiveView.swift         # Target: ✅ 勾選 particle-vision
+│   └── Info.plist                  # Target: 不需勾選 (於 Target 的 Build Settings 中綁定)
+└── README.md                       # Target: 不需勾選 (說明文件)
 ```
 
 ---
