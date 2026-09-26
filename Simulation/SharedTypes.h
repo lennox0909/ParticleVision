@@ -23,14 +23,12 @@ struct Particle {
 #endif
 };
 
-// 新增：用來構成 3D 網格三角形的頂點結構
+// 將原本的 ParticleVertex 替換為這個精簡版
 struct ParticleVertex {
 #ifdef __METAL_VERSION__
     float3 position;
-    float4 color;
 #else
     vector_float3 position;
-    vector_float4 color;
 #endif
 };
 
