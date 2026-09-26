@@ -6,13 +6,16 @@ struct ParticleVisionApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView() // 這裡包著你的 ControlPanelView 或開啟按鈕
+            ContentView()
                 .environment(simulator)
+                // 【新增】強制視窗的最小尺寸，確保資訊絕對不會被裁切
+                .frame(minWidth: 500, minHeight: 700)
         }
-        .defaultSize(width: 450, height: 750)
+        // 【修改】將預設大小加大 (原本可能是 width: 450, height: 750 等等)
+        .defaultSize(width: 500, height: 700)
+        // 讓視窗自動貼合內容尺寸
         .windowResizability(.contentSize)
 
-        // 【修復】將 id 改為 "ParticleSpace"，對齊按鈕呼叫的名稱
         ImmersiveSpace(id: "ParticleSpace") {
             ImmersiveView()
                 .environment(simulator)

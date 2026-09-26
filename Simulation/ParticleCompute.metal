@@ -1,11 +1,12 @@
 #include <metal_stdlib>
 using namespace metal;
 
+// 【修改】加入 originalIndex 來記憶原本在陣列中的位址
 struct Particle {
     float3 position;
     float3 velocity;
     uint type;
-    uint pad1;
+    uint originalIndex;
     uint pad2;
     uint pad3;
 };
@@ -19,9 +20,12 @@ struct SimParams {
     uint particleCount;
 };
 
+// 強制對齊 16 bytes，防止 GPU 記憶體溢位
 struct Cell {
     atomic_uint count;
-    uint indices[64];
+    uint startIndex;
+    atomic_uint currentOffset;
+    uint padding;
 };
 
 inline uint3 getCellCoords(float3 pos) {
@@ -37,32 +41,55 @@ kernel void clearGrid(device Cell* grid [[buffer(0)]],
                       uint id [[thread_position_in_grid]]) {
     if (id < 4096) {
         atomic_store_explicit(&grid[id].count, 0, memory_order_relaxed);
+        atomic_store_explicit(&grid[id].currentOffset, 0, memory_order_relaxed);
     }
 }
 
-kernel void buildGrid(device Particle* particles [[buffer(0)]],
+kernel void countGrid(device const Particle* particles [[buffer(0)]],
                       device Cell* grid [[buffer(1)]],
                       constant SimParams& params [[buffer(2)]],
                       uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
+    uint cellIndex = getCellIndex(getCellCoords(particles[id].position));
+    atomic_fetch_add_explicit(&grid[cellIndex].count, 1, memory_order_relaxed);
+}
 
-    float3 pos = particles[id].position;
-    uint cellIndex = getCellIndex(getCellCoords(pos));
-
-    uint count = atomic_fetch_add_explicit(&grid[cellIndex].count, 1, memory_order_relaxed);
-    if (count < 64) {
-        grid[cellIndex].indices[count] = id;
+kernel void prefixSumGrid(device Cell* grid [[buffer(0)]],
+                          uint id [[thread_position_in_grid]]) {
+    if (id == 0) {
+        uint sum = 0;
+        for (uint i = 0; i < 4096; i++) {
+            grid[i].startIndex = sum;
+            sum += atomic_load_explicit(&grid[i].count, memory_order_relaxed);
+        }
     }
 }
 
-kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
-                                 constant float* ruleMatrix [[buffer(1)]],
-                                 constant SimParams& params [[buffer(2)]],
-                                 device const Cell* grid [[buffer(3)]],
+kernel void reorderParticles(device const Particle* particlesIn [[buffer(0)]],
+                             device Particle* particlesOut [[buffer(1)]],
+                             device Cell* grid [[buffer(2)]],
+                             constant SimParams& params [[buffer(3)]],
+                             uint id [[thread_position_in_grid]]) {
+    if (id >= params.particleCount) return;
+    
+    Particle p = particlesIn[id];
+    uint cellIndex = getCellIndex(getCellCoords(p.position));
+    
+    uint offset = atomic_fetch_add_explicit(&grid[cellIndex].currentOffset, 1, memory_order_relaxed);
+    uint destIndex = grid[cellIndex].startIndex + offset;
+    
+    particlesOut[destIndex] = p;
+}
+
+kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
+                                 device const Particle* particlesIn [[buffer(1)]],
+                                 constant float* ruleMatrix [[buffer(2)]],
+                                 constant SimParams& params [[buffer(3)]],
+                                 device const Cell* grid [[buffer(4)]],
                                  uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
 
-    Particle p = particles[id];
+    Particle p = particlesIn[id];
     float3 force = float3(0.0);
     uint3 cellCoords = getCellCoords(p.position);
 
@@ -78,16 +105,16 @@ kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
                 }
 
                 uint neighborCellIndex = getCellIndex(uint3(neighborCoords));
+                uint startIndex = grid[neighborCellIndex].startIndex;
                 uint count = atomic_load_explicit(&grid[neighborCellIndex].count, memory_order_relaxed);
-                uint limit = min(count, 64u);
 
-                for (uint i = 0; i < limit; i++) {
-                    uint otherId = grid[neighborCellIndex].indices[i];
+                for (uint i = 0; i < count; i++) {
+                    uint otherId = startIndex + i;
                     if (otherId == id) continue;
 
-                    Particle other = particles[otherId];
+                    Particle other = particlesIn[otherId];
                     float3 d = p.position - other.position;
-                    float r = length(d);
+                    float r = fast::length(d);
 
                     if (r > 0.0 && r < params.rMax) {
                         d /= r;
@@ -109,19 +136,16 @@ kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
     p.velocity *= params.friction;
     p.position += p.velocity * params.dt;
 
-    // ==========================================
-    // 撈魚網物理：邊界穿透與推擠力 (Penetration Impulse)
-    // ==========================================
+    // 撈魚網物理邊界
     float bounds = 2.0;
-    float bounce = 0.4;     // 基本反彈力
-    float scoopForce = 0.8; // 網子掃過時賦予粒子的推擠力 (越大彈得越遠)
+    float bounce = 0.4;
+    float scoopForce = 0.8;
 
-    // X 軸
     if (p.position.x > bounds) {
-        float penetration = p.position.x - bounds; // 計算被網子吃進去多深
+        float penetration = p.position.x - bounds;
         p.position.x = bounds;
         if (p.velocity.x > 0) p.velocity.x *= -bounce;
-        p.velocity.x -= (penetration / params.dt) * scoopForce; // 賦予反向推擠速度
+        p.velocity.x -= (penetration / params.dt) * scoopForce;
     } else if (p.position.x < -bounds) {
         float penetration = -bounds - p.position.x;
         p.position.x = -bounds;
@@ -129,7 +153,6 @@ kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
         p.velocity.x += (penetration / params.dt) * scoopForce;
     }
 
-    // Y 軸
     if (p.position.y > bounds) {
         float penetration = p.position.y - bounds;
         p.position.y = bounds;
@@ -142,7 +165,6 @@ kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
         p.velocity.y += (penetration / params.dt) * scoopForce;
     }
 
-    // Z 軸
     if (p.position.z > bounds) {
         float penetration = p.position.z - bounds;
         p.position.z = bounds;
@@ -155,5 +177,6 @@ kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
         p.velocity.z += (penetration / params.dt) * scoopForce;
     }
 
-    particles[id] = p;
+    // 【核心修正】寫回原始身分證的記憶體位址，而非排序後的位址
+    particlesOut[p.originalIndex] = p;
 }
