@@ -1,29 +1,17 @@
-//
-//  ContentView.swift
-//  SandboxScience
-//
-//  Created by Tsai Bing-Shi on 2026/9/20.
-//
-
 import SwiftUI
-import RealityKit
 
 struct ContentView: View {
-
     var body: some View {
-        VStack {
-            Model3D(named: "Scene", bundle: .main)
-                .padding(.bottom, 50)
-
-            Text("Hello, world!")
-
+        VStack(spacing: 20) {
+            // 頂部放置空間切換按鈕
             ToggleImmersiveSpaceButton()
+                .padding(.top, 20)
+            
+            Divider()
+            
+            // 載入我們先前建立好的控制面板
+            ControlPanelView()
         }
-        .padding()
+        .frame(minWidth: 500, minHeight: 650)
     }
-}
-
-#Preview(windowStyle: .automatic) {
-    ContentView()
-        .environment(AppModel())
 }

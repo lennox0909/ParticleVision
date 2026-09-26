@@ -1,55 +1,51 @@
 #ifndef SharedTypes_h
 #define SharedTypes_h
 
+#ifdef __METAL_VERSION__
+#include <metal_stdlib>
+using namespace metal;
+#else
 #include <simd/simd.h>
+#include <stdint.h>
+#endif
 
 struct Particle {
+#ifdef __METAL_VERSION__
+    float3 position;
+    float3 velocity;
+    uint type;
+    uint pad1; uint pad2; uint pad3;
+#else
     vector_float3 position;
     vector_float3 velocity;
-    vector_float3 color;
-    int type;
+    uint32_t type;
+    uint32_t pad1; uint32_t pad2; uint32_t pad3;
+#endif
+};
+
+// 新增：用來構成 3D 網格三角形的頂點結構
+struct ParticleVertex {
+#ifdef __METAL_VERSION__
+    float3 position;
+    float4 color;
+#else
+    vector_float3 position;
+    vector_float4 color;
+#endif
 };
 
 struct SimParams {
-    vector_float3 leftHandPos;
-    vector_float3 rightHandPos;
-    vector_float3 prevLeftHandPos;
-    vector_float3 prevRightHandPos;
-    vector_int3 gridSize;
-    int particleCount;
     float dt;
     float friction;
-    float boundsSize;
-    int numTypes;
-    float cellSize;
-    int sceneTriangleCount;
-    int anchorCount;
-    vector_float3 boundsCenter;
-    
-    // 📍 新增：全域互動控制參數
-    float repelForce;
-    float forceMultiplier;
-};
-
-struct RenderVertex {
-    vector_float3 position;
-    vector_float3 normal;
-};
-
-struct SceneTriangle {
-    vector_float3 v0;
-    vector_float3 v1;
-    vector_float3 v2;
-    vector_float3 normal;
-};
-
-struct MeshAnchorBounds {
-    vector_float3 minBounds;
-    vector_float3 maxBounds;
-    int startIndex;
-    int triangleCount;
-    int pad1;
-    int pad2;
+    float rMax;
+    float rMin;
+#ifdef __METAL_VERSION__
+    uint numTypes;
+    uint particleCount;
+#else
+    uint32_t numTypes;
+    uint32_t particleCount;
+#endif
 };
 
 #endif /* SharedTypes_h */
