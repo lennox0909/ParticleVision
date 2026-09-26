@@ -1,95 +1,159 @@
 #include <metal_stdlib>
-#include "SharedTypes.h"
 using namespace metal;
 
-#define GRID_DIM 16
-#define MAX_PER_CELL 64
-#define SPACE_SIZE 4.0
-
-struct GridCell {
-    atomic_uint count;
-    uint indices[MAX_PER_CELL];
+struct Particle {
+    float3 position;
+    float3 velocity;
+    uint type;
+    uint pad1;
+    uint pad2;
+    uint pad3;
 };
 
-kernel void clearGrid(device GridCell* grid [[buffer(0)]], uint id [[thread_position_in_grid]]) {
-    if (id < (GRID_DIM * GRID_DIM * GRID_DIM)) {
+struct SimParams {
+    float dt;
+    float friction;
+    float rMax;
+    float rMin;
+    uint numTypes;
+    uint particleCount;
+};
+
+struct Cell {
+    atomic_uint count;
+    uint indices[64];
+};
+
+inline uint3 getCellCoords(float3 pos) {
+    float3 p = clamp(pos + 2.0, 0.0f, 3.9999f);
+    return uint3(p * 4.0f);
+}
+
+inline uint getCellIndex(uint3 coords) {
+    return coords.x + coords.y * 16 + coords.z * 256;
+}
+
+kernel void clearGrid(device Cell* grid [[buffer(0)]],
+                      uint id [[thread_position_in_grid]]) {
+    if (id < 4096) {
         atomic_store_explicit(&grid[id].count, 0, memory_order_relaxed);
     }
 }
 
 kernel void buildGrid(device Particle* particles [[buffer(0)]],
-                      device GridCell* grid [[buffer(1)]],
+                      device Cell* grid [[buffer(1)]],
                       constant SimParams& params [[buffer(2)]],
                       uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
-    
+
     float3 pos = particles[id].position;
-    int3 cellIndex = int3((pos + 2.0) / SPACE_SIZE * GRID_DIM);
-    cellIndex = clamp(cellIndex, 0, GRID_DIM - 1);
-    uint flatIndex = cellIndex.x + cellIndex.y * GRID_DIM + cellIndex.z * GRID_DIM * GRID_DIM;
-    
-    uint currentCount = atomic_fetch_add_explicit(&grid[flatIndex].count, 1, memory_order_relaxed);
-    if (currentCount < MAX_PER_CELL) {
-        grid[flatIndex].indices[currentCount] = id;
+    uint cellIndex = getCellIndex(getCellCoords(pos));
+
+    uint count = atomic_fetch_add_explicit(&grid[cellIndex].count, 1, memory_order_relaxed);
+    if (count < 64) {
+        grid[cellIndex].indices[count] = id;
     }
 }
 
 kernel void computeGridParticles(device Particle* particles [[buffer(0)]],
                                  constant float* ruleMatrix [[buffer(1)]],
                                  constant SimParams& params [[buffer(2)]],
-                                 device GridCell* grid [[buffer(3)]],
+                                 device const Cell* grid [[buffer(3)]],
                                  uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
 
-    Particle p1 = particles[id];
-    float3 totalForce = float3(0.0);
-    int3 cellIndex = int3((p1.position + 2.0) / SPACE_SIZE * GRID_DIM);
-    cellIndex = clamp(cellIndex, 0, GRID_DIM - 1);
+    Particle p = particles[id];
+    float3 force = float3(0.0);
+    uint3 cellCoords = getCellCoords(p.position);
 
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
-                int3 neighborIdx = cellIndex + int3(x, y, z);
-                if (neighborIdx.x < 0 || neighborIdx.x > 15 || neighborIdx.y < 0 || neighborIdx.y > 15 || neighborIdx.z < 0 || neighborIdx.z > 15) continue;
+                int3 neighborCoords = int3(cellCoords) + int3(x, y, z);
 
-                uint flatIndex = neighborIdx.x + neighborIdx.y * GRID_DIM + neighborIdx.z * GRID_DIM * GRID_DIM;
-                uint count = atomic_load_explicit(&grid[flatIndex].count, memory_order_relaxed);
-                uint limit = min(count, (uint)MAX_PER_CELL);
+                if (neighborCoords.x < 0 || neighborCoords.x > 15 ||
+                    neighborCoords.y < 0 || neighborCoords.y > 15 ||
+                    neighborCoords.z < 0 || neighborCoords.z > 15) {
+                    continue;
+                }
+
+                uint neighborCellIndex = getCellIndex(uint3(neighborCoords));
+                uint count = atomic_load_explicit(&grid[neighborCellIndex].count, memory_order_relaxed);
+                uint limit = min(count, 64u);
 
                 for (uint i = 0; i < limit; i++) {
-                    uint otherId = grid[flatIndex].indices[i];
+                    uint otherId = grid[neighborCellIndex].indices[i];
                     if (otherId == id) continue;
 
-                    Particle p2 = particles[otherId];
-                    float3 dir = p2.position - p1.position;
-                    float dist = length(dir);
+                    Particle other = particles[otherId];
+                    float3 d = p.position - other.position;
+                    float r = length(d);
 
-                    if (dist > 0.0 && dist < params.rMax) {
-                        dir = normalize(dir);
-                        float force = 0.0;
-                        if (dist < params.rMin) {
-                            force = (dist / params.rMin) - 1.0;
+                    if (r > 0.0 && r < params.rMax) {
+                        d /= r;
+
+                        if (r < params.rMin) {
+                            force += d * (1.0f - r / params.rMin) * 2.0f;
                         } else {
-                            uint matrixIndex = p1.type * params.numTypes + p2.type;
-                            float ruleValue = ruleMatrix[matrixIndex];
-                            float num = abs(dist - 0.5 * (params.rMax + params.rMin));
-                            float den = 0.5 * (params.rMax - params.rMin);
-                            force = ruleValue * (1.0 - (num / den));
+                            float rule = ruleMatrix[p.type * params.numTypes + other.type];
+                            float f = rule * (1.0f - abs(2.0f * r - params.rMax - params.rMin) / (params.rMax - params.rMin));
+                            force += d * f;
                         }
-                        totalForce += dir * force;
                     }
                 }
             }
         }
     }
 
-    p1.velocity = (p1.velocity + totalForce * params.dt) * params.friction;
-    p1.position += p1.velocity * params.dt;
+    p.velocity += force * params.dt;
+    p.velocity *= params.friction;
+    p.position += p.velocity * params.dt;
 
-    float boundary = 2.0;
-    if (p1.position.x > boundary || p1.position.x < -boundary) { p1.velocity.x *= -1.0; }
-    if (p1.position.y > boundary || p1.position.y < -boundary) { p1.velocity.y *= -1.0; }
-    if (p1.position.z > boundary || p1.position.z < -boundary) { p1.velocity.z *= -1.0; }
+    // ==========================================
+    // 撈魚網物理：邊界穿透與推擠力 (Penetration Impulse)
+    // ==========================================
+    float bounds = 2.0;
+    float bounce = 0.4;     // 基本反彈力
+    float scoopForce = 0.8; // 網子掃過時賦予粒子的推擠力 (越大彈得越遠)
 
-    particles[id] = p1;
+    // X 軸
+    if (p.position.x > bounds) {
+        float penetration = p.position.x - bounds; // 計算被網子吃進去多深
+        p.position.x = bounds;
+        if (p.velocity.x > 0) p.velocity.x *= -bounce;
+        p.velocity.x -= (penetration / params.dt) * scoopForce; // 賦予反向推擠速度
+    } else if (p.position.x < -bounds) {
+        float penetration = -bounds - p.position.x;
+        p.position.x = -bounds;
+        if (p.velocity.x < 0) p.velocity.x *= -bounce;
+        p.velocity.x += (penetration / params.dt) * scoopForce;
+    }
+
+    // Y 軸
+    if (p.position.y > bounds) {
+        float penetration = p.position.y - bounds;
+        p.position.y = bounds;
+        if (p.velocity.y > 0) p.velocity.y *= -bounce;
+        p.velocity.y -= (penetration / params.dt) * scoopForce;
+    } else if (p.position.y < -bounds) {
+        float penetration = -bounds - p.position.y;
+        p.position.y = -bounds;
+        if (p.velocity.y < 0) p.velocity.y *= -bounce;
+        p.velocity.y += (penetration / params.dt) * scoopForce;
+    }
+
+    // Z 軸
+    if (p.position.z > bounds) {
+        float penetration = p.position.z - bounds;
+        p.position.z = bounds;
+        if (p.velocity.z > 0) p.velocity.z *= -bounce;
+        p.velocity.z -= (penetration / params.dt) * scoopForce;
+    } else if (p.position.z < -bounds) {
+        float penetration = -bounds - p.position.z;
+        p.position.z = -bounds;
+        if (p.velocity.z < 0) p.velocity.z *= -bounce;
+        p.velocity.z += (penetration / params.dt) * scoopForce;
+    }
+
+    particles[id] = p;
 }

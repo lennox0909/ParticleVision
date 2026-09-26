@@ -2,18 +2,17 @@ import SwiftUI
 
 @main
 struct ParticleVisionApp: App {
-    // 確保整個 App 生命週期只有一個 Simulator 實體
     @State private var simulator = ParticleSimulator()
-    
+
     var body: some Scene {
-        // 預設開啟的 2D 視窗 (包含控制台與啟動按鈕)
         WindowGroup {
-            ContentView()
+            ContentView() // 這裡包著你的 ControlPanelView 或開啟按鈕
                 .environment(simulator)
         }
-        .defaultSize(width: 850, height: 600)
+        .defaultSize(width: 450, height: 750)
+        .windowResizability(.contentSize)
 
-        // 定義 3D 沉浸空間
+        // 【修復】將 id 改為 "ParticleSpace"，對齊按鈕呼叫的名稱
         ImmersiveSpace(id: "ParticleSpace") {
             ImmersiveView()
                 .environment(simulator)

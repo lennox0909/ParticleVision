@@ -9,7 +9,6 @@ class ParticleSimulator {
     private var device: MTLDevice!
     private var commandQueue: MTLCommandQueue!
     
-    // 三個運算管線 (空間雜湊專用)
     private var clearGridPipeline: MTLComputePipelineState!
     private var buildGridPipeline: MTLComputePipelineState!
     private var computeGridPipeline: MTLComputePipelineState!
@@ -25,29 +24,22 @@ class ParticleSimulator {
     var particleCount: Int
     var numTypes: Int
     
-    // 控制圓球大小的屬性 (最大值為 0.015)
-    var particleScale: Float = 0.004 {
-            didSet {
-                // 確保舊數值大於 0，避免除以零的錯誤
-                guard oldValue > 0 else { return }
-                
-                // 1. 計算縮放倍率 (新大小 / 舊大小)
-                let scaleRatio = particleScale / oldValue
-                
-                // 2. 將交互作用距離等比例乘上倍率
-                params.rMax *= scaleRatio
-                params.rMin *= scaleRatio
-                
-                // 3. 立即將更新後的參數推送到 GPU 緩衝區
-                updateParamsBuffer()
-            }
+    var needsVisualRebuild: Bool = false
+    
+    var particleScale: Float = 0.015 {
+        didSet {
+            guard oldValue > 0 else { return }
+            let scaleRatio = particleScale / oldValue
+            params.rMax *= scaleRatio
+            params.rMin *= scaleRatio
+            updateParamsBuffer()
+        }
     }
     
     var ruleMatrix: [Float] = [] {
         didSet { updateRuleMatrixBuffer() }
     }
     
-    // 配合 Entity 實體同步架構，將數量鎖定在 2,500 顆
     init(particleCount: Int = 4000, numTypes: Int = 4) {
         self.particleCount = particleCount
         self.numTypes = numTypes
@@ -69,7 +61,17 @@ class ParticleSimulator {
         self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
     }
     
-    // MARK: - Metal 初始化
+    func resetSimulation(newCount: Int, newTypes: Int) {
+        self.particleCount = newCount
+        self.numTypes = newTypes
+        
+        self.params.particleCount = UInt32(newCount)
+        self.params.numTypes = UInt32(newTypes)
+        
+        setupBuffers()
+        self.needsVisualRebuild = true
+    }
+    
     private func setupMetal() {
         guard let defaultDevice = MTLCreateSystemDefaultDevice(),
               let queue = defaultDevice.makeCommandQueue() else {
@@ -91,7 +93,6 @@ class ParticleSimulator {
         }
     }
     
-    // MARK: - 記憶體配置
     private func setupBuffers() {
         var initialParticles = [Particle]()
         for _ in 0..<particleCount {
@@ -136,14 +137,12 @@ class ParticleSimulator {
         pointer.pointee = params
     }
     
-    // MARK: - 執行 GPU 物理運算 (三階段管線)
     func updateSimulation() {
         guard let commandBuffer = commandQueue.makeCommandBuffer(),
               let computeEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
         
         let numCells = 4096
         
-        // 1. 清空網格計數器
         computeEncoder.setComputePipelineState(clearGridPipeline)
         computeEncoder.setBuffer(gridBuffer, offset: 0, index: 0)
         var w = clearGridPipeline.maxTotalThreadsPerThreadgroup
@@ -152,7 +151,6 @@ class ParticleSimulator {
             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1)
         )
         
-        // 2. 建立網格
         computeEncoder.setComputePipelineState(buildGridPipeline)
         computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
         computeEncoder.setBuffer(gridBuffer, offset: 0, index: 1)
@@ -163,7 +161,6 @@ class ParticleSimulator {
             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1)
         )
         
-        // 3. 網格化物理運算
         computeEncoder.setComputePipelineState(computeGridPipeline)
         computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
         computeEncoder.setBuffer(ruleMatrixBuffer, offset: 0, index: 1)
@@ -177,8 +174,38 @@ class ParticleSimulator {
         
         computeEncoder.endEncoding()
         commandBuffer.commit()
-        
-        // 卡住 CPU，確保 RealityKit 抓取座標前 GPU 已計算完畢
         commandBuffer.waitUntilCompleted()
+    }
+    
+    // MARK: - 空間慣性與相對運動運算 -
+    
+    func applyInertia(oldBoxMatrix: simd_float4x4, newBoxMatrix: simd_float4x4) {
+        let relativeTransform = newBoxMatrix.inverse * oldBoxMatrix
+        
+        let rotOld = simd_float3x3(
+            SIMD3<Float>(oldBoxMatrix.columns.0.x, oldBoxMatrix.columns.0.y, oldBoxMatrix.columns.0.z),
+            SIMD3<Float>(oldBoxMatrix.columns.1.x, oldBoxMatrix.columns.1.y, oldBoxMatrix.columns.1.z),
+            SIMD3<Float>(oldBoxMatrix.columns.2.x, oldBoxMatrix.columns.2.y, oldBoxMatrix.columns.2.z)
+        )
+        let rotNew = simd_float3x3(
+            SIMD3<Float>(newBoxMatrix.columns.0.x, newBoxMatrix.columns.0.y, newBoxMatrix.columns.0.z),
+            SIMD3<Float>(newBoxMatrix.columns.1.x, newBoxMatrix.columns.1.y, newBoxMatrix.columns.1.z),
+            SIMD3<Float>(newBoxMatrix.columns.2.x, newBoxMatrix.columns.2.y, newBoxMatrix.columns.2.z)
+        )
+        let relativeRotation = rotNew.inverse * rotOld
+        
+        let pointer = particleBuffer.contents().bindMemory(to: Particle.self, capacity: particleCount)
+        
+        for i in 0..<particleCount {
+            var p = pointer[i]
+            
+            let pos4 = SIMD4<Float>(p.position, 1.0)
+            let newPos4 = relativeTransform * pos4
+            p.position = SIMD3<Float>(newPos4.x, newPos4.y, newPos4.z)
+            
+            p.velocity = relativeRotation * p.velocity
+            
+            pointer[i] = p
+        }
     }
 }
