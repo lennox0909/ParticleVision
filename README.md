@@ -98,7 +98,7 @@ particle-vision/
 
 ```mermaid
 ---
-title: 階段零：作業系統預載 (Stage 0: OS Pre-launch)
+title: "階段零：作業系統預載 (Stage 0: OS Pre-launch)"
 ---
 flowchart TD
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
@@ -106,15 +106,15 @@ flowchart TD
     classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
     classDef startEnd fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000,rx:10,ry:10;
 
-    S(["作業系統啟動<br/>(OS Launch)"]):::startEnd
+    S([""作業系統啟動<br/>(OS Launch)""]):::startEnd
     
     subgraph "靜態資源讀取 (Static Resource Load)"
         direction LR
         F_Plist[("Info.plist")]:::fileNode
-        A1(["確認 App 屬性與權限<br/>(Check App Props)"]):::action
+        A1([""確認 App 屬性與權限<br/>(Check App Props)""]):::action
         
         F_Assets[("Assets.xcassets")]:::fileNode
-        A2(["預載圖示與色彩<br/>(Preload Assets)"]):::action
+        A2([""預載圖示與色彩<br/>(Preload Assets)""]):::action
     end
 
     S --> F_Plist --> A1
@@ -134,7 +134,7 @@ flowchart TD
 
 ```mermaid
 ---
-title: 階段一：App 啟動與全域狀態初始化 (Stage 1: App Launch & State Init)
+title: "階段一：App 啟動與全域狀態初始化 (Stage 1: App Launch & State Init)"
 ---
 flowchart TD
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
@@ -142,7 +142,7 @@ flowchart TD
     classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
 
     F_App[("ParticleVisionApp<br/>.swift")]:::fileNode
-    A1(["宣告視窗與 3D 空間<br/>(Declare Window & Space)"]):::action
+    A1([""宣告視窗與 3D 空間<br/>(Declare Window & Space)""]):::action
 
     subgraph "全域狀態模型 (Global Models)"
         direction LR
@@ -151,7 +151,7 @@ flowchart TD
         F_Sim[("ParticleSimulator<br/>.swift")]:::fileNode
     end
 
-    A2(["注入環境變數<br/>(Inject Environment)"]):::action
+    A2([""注入環境變數<br/>(Inject Environment)""]):::action
 
     F_App --> A1
     A1 --> F_Model
@@ -178,7 +178,7 @@ flowchart TD
 
 ```mermaid
 ---
-title: 階段二：Metal 物理引擎與 GPU 資源分配 (Stage 2: Metal & GPU Alloc)
+title: "階段二：Metal 物理引擎與 GPU 資源分配 (Stage 2: Metal & GPU Alloc)"
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
@@ -188,12 +188,12 @@ flowchart TD
     classDef action fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
     F_Sim[("ParticleSimulator<br/>.swift")]:::swiftFile
-    A1(["請求獲取 GPU 權限<br/>(Request GPU Device)"]):::action
+    A1([""請求獲取 GPU 權限<br/>(Request GPU Device)""]):::action
 
     subgraph "橋接層 (Bridging Layer)"
         direction LR
         F_Bridge[("Bridging-Header.h")]:::headerFile
-        A2(["結構體記憶體對齊<br/>(Memory Alignment)"]):::action
+        A2([""結構體記憶體對齊<br/>(Memory Alignment)""]):::action
         F_Shared[("SharedTypes.h")]:::headerFile
         F_Bridge --> A2 --> F_Shared
     end
@@ -201,8 +201,8 @@ flowchart TD
     subgraph "GPU 運算層 (GPU Compute)"
         direction LR
         F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
-        A3(["編譯 5 個 Kernel 函數<br/>(Compile Kernels)"]):::action
-        A4(["開闢雙重緩衝區<br/>(Alloc VRAM Buffers)"]):::action
+        A3([""編譯 5 個 Kernel 函數<br/>(Compile Kernels)""]):::action
+        A4([""開闢雙重緩衝區<br/>(Alloc VRAM Buffers)""]):::action
         F_Metal --> A3 --> A4
     end
 
@@ -224,7 +224,7 @@ flowchart TD
 
 ```mermaid
 ---
-title: 階段三：2D 控制面板渲染 (Stage 3: 2D UI Render)
+title: "階段三：2D 控制面板渲染 (Stage 3: 2D UI Render)"
 ---
 flowchart TD
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
@@ -232,16 +232,16 @@ flowchart TD
     classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
 
     F_Content[("ContentView<br/>.swift")]:::fileNode
-    A1(["排版主視覺容器<br/>(Layout Main View)"]):::action
+    A1([""排版主視覺容器<br/>(Layout Main View)""]):::action
 
     subgraph "子元件 (Sub-components)"
         direction TB
         F_Panel[("ControlPanelView<br/>.swift")]:::fileNode
-        A2(["繪製拉桿並綁定參數<br/>(Draw Sliders & Bind)"]):::action
+        A2([""繪製拉桿並綁定參數<br/>(Draw Sliders & Bind)""]):::action
         F_Panel --> A2
         
         F_Btn[("ToggleImmersive<br/>SpaceButton.swift")]:::fileNode
-        A3(["監聽點擊事件準備切換<br/>(Listen for Tap)"]):::action
+        A3([""監聽點擊事件準備切換<br/>(Listen for Tap)""]):::action
         F_Btn --> A3
     end
 
@@ -267,7 +267,7 @@ flowchart TD
   
 ```mermaid
 ---
-title: 階段四：進入沉浸式空間與 ARKit 啟動 (Stage 4: Immersive & ARKit Init)
+title: "階段四：進入沉浸式空間與 ARKit 啟動 (Stage 4: Immersive & ARKit Init)"
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
@@ -281,16 +281,16 @@ flowchart TD
     subgraph "3D 資源載入 (3D Asset Load)"
         direction LR
         F_Sphere[("Sphere.usda")]:::modelFile
-        A1(["複製 2500 顆實體<br/>(Clone Entities)"]):::action
-        A2(["建立隱形邊界框<br/>(Create Collision Box)"]):::action
+        A1([""複製 2500 顆實體<br/>(Clone Entities)""]):::action
+        A2([""建立隱形邊界框<br/>(Create Collision Box)""]):::action
         F_Sphere --> A1 --> A2
     end
 
     subgraph "ARKit 啟動 (ARKit Launch)"
         direction LR
-        A3(["請求手部骨架追蹤<br/>(Request Hand Tracking)"]):::action
+        A3([""請求手部骨架追蹤<br/>(Request Hand Tracking)""]):::action
         F_Sim[("ParticleSimulator<br/>.swift")]:::engineFile
-        A4(["準備接收物理座標<br/>(Ready Physics Input)"]):::action
+        A4([""準備接收物理座標<br/>(Ready Physics Input)""]):::action
         A3 --> F_Sim --> A4
     end
 
@@ -317,7 +317,7 @@ flowchart TD
   
 ```mermaid
 ---
-title: 階段五：每秒 90 次的極限模擬迴圈 (Stage 5: 90Hz Render Loop)
+title: "階段五：每秒 90 次的極限模擬迴圈 (Stage 5: 90Hz Render Loop)"
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
@@ -327,15 +327,15 @@ flowchart TD
     classDef action fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000;
     classDef loop fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
-    L(["開始 90Hz 迴圈<br/>(Start 90Hz Loop)"]):::loop
+    L([""開始 90Hz 迴圈<br/>(Start 90Hz Loop)""]):::loop
 
     subgraph "輸入與 CPU 運算 (Input & CPU Math)"
         direction TB
         F_Imm[("ImmersiveView<br/>.swift")]:::uiFile
-        A1(["讀取手部 Pinch 座標<br/>(Get Hand Coordinates)"]):::action
+        A1([""讀取手部 Pinch 座標<br/>(Get Hand Coordinates)""]):::action
         F_Sim[("ParticleSimulator<br/>.swift")]:::engineFile
-        A2(["計算空間慣性位移<br/>(Apply Inertia)"]):::action
-        A3(["發送 GPU 運算指令<br/>(Send GPU Commands)"]):::action
+        A2([""計算空間慣性位移<br/>(Apply Inertia)""]):::action
+        A3([""發送 GPU 運算指令<br/>(Send GPU Commands)""]):::action
         
         F_Imm --> A1 --> F_Sim --> A2 --> A3
     end
@@ -343,11 +343,11 @@ flowchart TD
     subgraph "GPU 平行處理 (GPU Parallel)"
         direction TB
         F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
-        A4(["GPU 網格排序與引力<br/>(GPU Parallel Compute)"]):::action
+        A4([""GPU 網格排序與引力<br/>(GPU Parallel Compute)""]):::action
         F_Metal --> A4
     end
     
-    A5(["更新 RealityKit 畫面<br/>(Update RealityKit)"]):::action
+    A5([""更新 RealityKit 畫面<br/>(Update RealityKit)""]):::action
 
     L --> F_Imm
     A3 --> F_Metal
