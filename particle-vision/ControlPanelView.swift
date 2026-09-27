@@ -14,7 +14,7 @@ struct ControlPanelView: View {
             VStack(alignment: .leading) {
                 Text("粒子數量: \(Int(particleCount))")
                     .font(.headline)
-                Slider(value: $particleCount, in: 100...4000, step: 100)
+                Slider(value: $particleCount, in: 100...16000, step: 100)
             }
             
             VStack(alignment: .leading) {

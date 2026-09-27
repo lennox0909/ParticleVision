@@ -101,3 +101,31 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     // 【核心修正】寫回原始身分證的記憶體位址，而非排序後的位址
     particlesOut[p.originalIndex] = p;
 }
+// 👆 上面這個大括號非常重要，代表 computeGridParticles 函式結束。
+
+// 👇 下方的常數與新的 kernel 必須完全獨立在外面！
+
+// 定義二十面體 (Icosahedron) 的 12 個標準頂點
+constant float a = 0.525731f;
+constant float b = 0.850651f;
+constant float3 sphereVerts[12] = {
+    float3(-a,  b,  0), float3( a,  b,  0), float3(-a, -b,  0), float3( a, -b,  0),
+    float3( 0, -a,  b), float3( 0,  a,  b), float3( 0, -a, -b), float3( 0,  a, -b),
+    float3( b,  0, -a), float3( b,  0,  a), float3(-b,  0, -a), float3(-b,  0,  a)
+};
+
+// 直接更新 LowLevelMesh 頂點的 Kernel
+kernel void updateMeshVertices(device const Particle* particles [[buffer(0)]],
+                               device float3* vertices [[buffer(1)]],
+                               constant SimParams& params [[buffer(2)]],
+                               uint id [[thread_position_in_grid]]) {
+    if (id >= params.particleCount) return;
+    
+    Particle p = particles[id];
+    uint vIndex = p.originalIndex * 12;
+    float size = 0.015; // 對應原本的 particleScale
+
+    for(int i=0; i<12; i++) {
+        vertices[vIndex + i] = p.position + sphereVerts[i] * size;
+    }
+}

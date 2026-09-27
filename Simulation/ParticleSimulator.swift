@@ -2,9 +2,14 @@ import Foundation
 import Metal
 import simd
 import Observation
+import RealityKit
 
 @Observable
 class ParticleSimulator {
+    // ✨ 補上 GPU Mesh 渲染所需的變數
+    var meshResource: MeshResource!
+    var lowLevelMesh: LowLevelMesh?
+    var updateMeshPipeline: MTLComputePipelineState!
     // 移除 private，讓 Extension 可以跨檔案存取
     var device: MTLDevice!
     var commandQueue: MTLCommandQueue!
