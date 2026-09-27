@@ -105,6 +105,12 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
 
 // 👇 下方的常數與新的 kernel 必須完全獨立在外面！
 
+// 新增：包含位置與法線的頂點結構
+struct ParticleVertex {
+    float3 position;
+    float3 normal;
+};
+
 // 定義二十面體 (Icosahedron) 的 12 個標準頂點
 constant float a = 0.525731f;
 constant float b = 0.850651f;
@@ -114,18 +120,20 @@ constant float3 sphereVerts[12] = {
     float3( b,  0, -a), float3( b,  0,  a), float3(-b,  0, -a), float3(-b,  0,  a)
 };
 
-// 直接更新 LowLevelMesh 頂點的 Kernel
+// 替換原有的 kernel，改為輸出 ParticleVertex
 kernel void updateMeshVertices(device const Particle* particles [[buffer(0)]],
-                               device float3* vertices [[buffer(1)]],
+                               device ParticleVertex* vertices [[buffer(1)]],
                                constant SimParams& params [[buffer(2)]],
                                uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
     
     Particle p = particles[id];
     uint vIndex = p.originalIndex * 12;
-    float size = 0.015; // 對應原本的 particleScale
+    float size = 0.015;
 
     for(int i=0; i<12; i++) {
-        vertices[vIndex + i] = p.position + sphereVerts[i] * size;
+        vertices[vIndex + i].position = p.position + sphereVerts[i] * size;
+        // 由於我們是以圓球為基底，頂點的標準化相對座標，剛好就是指向外側的法線向量！
+        vertices[vIndex + i].normal = sphereVerts[i];
     }
 }

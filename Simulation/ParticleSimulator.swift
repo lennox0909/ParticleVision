@@ -6,7 +6,8 @@ import RealityKit
 
 @Observable
 class ParticleSimulator {
-    // ✨ 補上 GPU Mesh 渲染所需的變數
+    // ✨ 新增這行：發光效果開關
+    var glowIntensity: Float = 0.0
     var meshResource: MeshResource!
     var lowLevelMesh: LowLevelMesh?
     var updateMeshPipeline: MTLComputePipelineState!

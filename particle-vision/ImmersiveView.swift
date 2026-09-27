@@ -95,6 +95,11 @@ struct ImmersiveView: View {
                 simulator.needsVisualRebuild = false
             }
         }
+        // ✨ 新增：監聽螢光開關，一旦切換就呼叫剛剛寫好的材質更新函式
+        .onChange(of: simulator.glowIntensity) { _, _ in
+                    updateParticleMaterials()
+        }
+        
         .onDisappear {
             frameSubscription?.cancel()
             frameSubscription = nil

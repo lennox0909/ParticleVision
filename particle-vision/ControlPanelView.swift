@@ -41,6 +41,14 @@ struct ControlPanelView: View {
                         simulator.friction = Float(newValue)
                     }
             }
+            // ✨ 將原本的 Toggle 替換為這組 Slider
+            @Bindable var bindableSimulator = simulator
+            VStack(alignment: .leading) {
+                Text("螢光強度: \(String(format: "%.1f", simulator.glowIntensity))")
+                // 設定範圍從 0 到 10
+                Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.5)
+                    .tint(.cyan)
+            }
             
             HStack(spacing: 20) {
                 Button("隨機引力規則") {
@@ -54,7 +62,7 @@ struct ControlPanelView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding(30)
+        .padding(20)
         .glassBackgroundEffect()
     }
 }

@@ -13,7 +13,7 @@ extension Entity {
     
     // 產生外框線條的工具
     func addBoxEdges(size: Float) {
-        let thickness: Float = 0.015
+        let thickness: Float = 0.008
         let half = size / 2.0
         let edgeMaterial = UnlitMaterial(color: UIColor.white.withAlphaComponent(0.8))
         

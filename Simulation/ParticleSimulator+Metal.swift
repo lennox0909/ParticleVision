@@ -78,11 +78,14 @@ extension ParticleSimulator {
             descriptor.indexCapacity = particleCount * 60
             descriptor.indexType = .uint32
             
+            // ✨ 修改：加入 Normal 屬性，並設定記憶體偏移量 (16 Bytes)
             descriptor.vertexAttributes = [
-                LowLevelMesh.Attribute(semantic: .position, format: .float3, offset: 0)
+                        LowLevelMesh.Attribute(semantic: .position, format: .float3, offset: 0),
+                        LowLevelMesh.Attribute(semantic: .normal, format: .float3, offset: 16)
             ]
+                    // ✨ 修改：每個頂點的資料總長度變為 32 Bytes (Position 16 + Normal 16)
             descriptor.vertexLayouts = [
-                LowLevelMesh.Layout(bufferIndex: 0, bufferStride: MemoryLayout<SIMD3<Float>>.stride)
+                        LowLevelMesh.Layout(bufferIndex: 0, bufferStride: 32)
             ]
             
             do {
