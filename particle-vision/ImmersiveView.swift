@@ -95,26 +95,15 @@ struct ImmersiveView: View {
             frameSubscription = nil
         }
         
-        .gesture(
-            DragGesture()
-                .targetedToAnyEntity()
-                .onChanged { value in
-                    guard !isScaling else { return }
-                    
-                    if activeHand == nil {
-                        activeHand = findPinchingHand()
-                        
-                        if let chirality = activeHand, let anchor = latestHandAnchors[chirality] {
-                            initialHandTransform = anchor.originFromAnchorTransform
-                            initialBoxTransform = containerBox.transform.matrix
-                        }
-                    }
-                }
-                .onEnded { _ in
-                    activeHand = nil
-                    initialHandTransform = nil
-                    initialBoxTransform = nil
-                }
+        // 使用我們剛剛抽離出來的乾淨 API
+        .containerDragGesture(
+            isScaling: $isScaling,
+            activeHand: $activeHand,
+            initialHandTransform: $initialHandTransform,
+            initialBoxTransform: $initialBoxTransform,
+            latestHandAnchors: latestHandAnchors,
+            containerBox: containerBox,
+            findPinchingHand: findPinchingHand
         )
         .simultaneousGesture(
             MagnifyGesture()
