@@ -7,9 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B85C44F8305FA9E800F5CA61 /* ParticleCompute.metal in Sources */ = {isa = PBXBuildFile; fileRef = B85C44F7305FA9E800F5CA61 /* ParticleCompute.metal */; };
 		B8BB3E8E3068F184005EE1A3 /* SimulationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E8D3068F184005EE1A3 /* SimulationModels.swift */; };
 		B8BB3E903068F1C2005EE1A3 /* ParticleSimulator+Metal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E8F3068F1C2005EE1A3 /* ParticleSimulator+Metal.swift */; };
+		B8BB3E943068F358005EE1A3 /* GridSorting.metal in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E933068F358005EE1A3 /* GridSorting.metal */; };
+		B8BB3E963068F386005EE1A3 /* ParticlePhysics.metal in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E953068F386005EE1A3 /* ParticlePhysics.metal */; };
 		B8E2D857305FA185005944C0 /* ParticleSimulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8E2D84F305F9800005944C0 /* ParticleSimulator.swift */; };
 /* End PBXBuildFile section */
 
@@ -26,9 +27,11 @@
 /* Begin PBXFileReference section */
 		B825965B3066587E007E615A /* particle-vision-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "particle-vision-Bridging-Header.h"; sourceTree = "<group>"; };
 		B82D5DE930615645008C7558 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		B85C44F7305FA9E800F5CA61 /* ParticleCompute.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ParticleCompute.metal; sourceTree = "<group>"; };
 		B8BB3E8D3068F184005EE1A3 /* SimulationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationModels.swift; sourceTree = "<group>"; };
 		B8BB3E8F3068F1C2005EE1A3 /* ParticleSimulator+Metal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParticleSimulator+Metal.swift"; sourceTree = "<group>"; };
+		B8BB3E923068F32B005EE1A3 /* ParticleTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ParticleTypes.h; sourceTree = "<group>"; };
+		B8BB3E933068F358005EE1A3 /* GridSorting.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = GridSorting.metal; sourceTree = "<group>"; };
+		B8BB3E953068F386005EE1A3 /* ParticlePhysics.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ParticlePhysics.metal; sourceTree = "<group>"; };
 		B8E2D824305F9780005944C0 /* particle-vision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "particle-vision.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B8E2D83B305F9781005944C0 /* particle-visionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "particle-visionTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B8E2D84F305F9800005944C0 /* ParticleSimulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleSimulator.swift; sourceTree = "<group>"; };
@@ -103,10 +106,12 @@
 			children = (
 				B8E2D84F305F9800005944C0 /* ParticleSimulator.swift */,
 				B825965B3066587E007E615A /* particle-vision-Bridging-Header.h */,
-				B85C44F7305FA9E800F5CA61 /* ParticleCompute.metal */,
 				B8E2D851305F9893005944C0 /* SharedTypes.h */,
 				B8BB3E8D3068F184005EE1A3 /* SimulationModels.swift */,
 				B8BB3E8F3068F1C2005EE1A3 /* ParticleSimulator+Metal.swift */,
+				B8BB3E923068F32B005EE1A3 /* ParticleTypes.h */,
+				B8BB3E933068F358005EE1A3 /* GridSorting.metal */,
+				B8BB3E953068F386005EE1A3 /* ParticlePhysics.metal */,
 			);
 			path = Simulation;
 			sourceTree = "<group>";
@@ -209,8 +214,9 @@
 		B8E2D820305F9780005944C0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				B8BB3E943068F358005EE1A3 /* GridSorting.metal in Sources */,
 				B8E2D857305FA185005944C0 /* ParticleSimulator.swift in Sources */,
-				B85C44F8305FA9E800F5CA61 /* ParticleCompute.metal in Sources */,
+				B8BB3E963068F386005EE1A3 /* ParticlePhysics.metal in Sources */,
 				B8BB3E903068F1C2005EE1A3 /* ParticleSimulator+Metal.swift in Sources */,
 				B8BB3E8E3068F184005EE1A3 /* SimulationModels.swift in Sources */,
 			);
