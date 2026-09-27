@@ -169,108 +169,107 @@ particle-vision/
 
 ```mermaid
 ---
-title: Particle Life visionOS - 全域生命週期 (Global App Lifecycle)
+title: 啟動與 2D 介面載入 (App Launch & 2D UI)
 ---
 flowchart TD
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
-    classDef startEnd fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000,rx:10,ry:10;
-    classDef stageNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
     classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+    classDef stage fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#000;
 
-    S(["系統點擊啟動<br/>(App Icon Tapped)"]):::startEnd
-    E(["應用程式運行中<br/>(App Running)"]):::startEnd
-    Transition(["切換至 3D 空間<br/>(Switch to 3D Space)"]):::action
+    S(["系統點擊啟動<br/>(App Icon Tapped)"]):::stage
 
-    subgraph "初始與 2D 介面 (Init & 2D UI)"
+    subgraph "階段零與階段一 (Stage 0 & 1)"
         direction LR
-        Stage0["階段零：作業系統預載<br/>(Stage 0: OS Pre-load)"]:::stageNode
-        Stage1["階段一：App 初始化<br/>(Stage 1: App Launch)"]:::stageNode
-        Stage2["階段二：GPU 資源分配<br/>(Stage 2: GPU Alloc)"]:::stageNode
-        Stage3["階段三：2D 面板渲染<br/>(Stage 3: 2D UI Render)"]:::stageNode
+        F_Plist[("Info.plist &<br/>Assets.xcassets")]:::fileNode
+        A1(["讀取設定預載資源<br/>(Load Config & Assets)"]):::action
+        F_App[("ParticleVisionApp<br/>.swift")]:::fileNode
+        F_Model[("AppModel &<br/>SimulationSettings")]:::fileNode
         
-        Stage0 --> Stage1 --> Stage2 --> Stage3
+        F_Plist --> A1 --> F_App --> F_Model
     end
 
-    subgraph "3D 渲染與互動 (3D Render & Interact)"
+    subgraph "階段三：介面渲染 (Stage 3: UI)"
         direction LR
-        Stage4["階段四：沉浸式與 ARKit<br/>(Stage 4: Immersive & ARKit)"]:::stageNode
-        Stage5["階段五：極限模擬迴圈<br/>(Stage 5: Render Loop)"]:::stageNode
+        F_Content[("ContentView<br/>.swift")]:::fileNode
+        F_Panel[("ControlPanelView<br/>.swift")]:::fileNode
+        F_Btn[("ToggleImmersive<br/>SpaceButton.swift")]:::fileNode
         
-        Stage4 --> Stage5
+        F_Content --> F_Panel
+        F_Content --> F_Btn
     end
 
-    S --> Stage0
-    Stage3 --> Transition
-    Transition --> Stage4
-    Stage5 --> E
+    S --> F_Plist
+    F_Model -->|"觸發<br/>(Trigger)"| F_Content
 ```
 
 ```mermaid
 ---
-title: 子模組一：Metal 物理引擎與 GPU 資源分配 (Metal & GPU Init)
+title: Metal 物理引擎與檔案關聯 (Metal Engine & Files)
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
-    classDef cpuAction fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
-    classDef gpuAction fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
-    classDef point fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#000;
+    classDef swiftFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef metalFile fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+    classDef headerFile fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
+    classDef action fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
-    Start(["初始化 ParticleSimulator<br/>(Init Physics Engine)"]):::point
+    F_Sim[("ParticleSimulator<br/>.swift")]:::swiftFile
 
-    subgraph "CPU 處理階段 (CPU Phase)"
-        direction TB
-        A1(["橋接編譯與記憶體對齊<br/>(Memory Alignment)"]):::cpuAction
-        A2(["向系統請求 GPU 權限<br/>(Request GPU Device)"]):::cpuAction
-        A1 --> A2
+    subgraph "C/C++ 橋接層 (Bridging Layer)"
+        direction LR
+        F_Bridge[("Bridging-Header.h")]:::headerFile
+        F_Shared[("SharedTypes.h")]:::headerFile
+        A1(["定義共用結構對齊<br/>(Memory Alignment)"]):::action
+        F_Bridge --> A1 --> F_Shared
     end
 
-    subgraph "GPU 處理階段 (GPU Phase)"
-        direction TB
-        A3(["編譯 Shader 核心函數<br/>(Compile Shader Kernels)"]):::gpuAction
-        A4(["分配 VRAM 雙重緩衝區<br/>(Allocate VRAM Buffers)"]):::gpuAction
-        A3 --> A4
+    subgraph "GPU 著色器層 (GPU Shader Layer)"
+        direction LR
+        F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
+        A2(["編譯 5 個 Kernel 函數<br/>(Compile Kernels)"]):::action
+        A3(["分配雙重緩衝區<br/>(Alloc Dual Buffers)"]):::action
+        F_Metal --> A2 --> A3
     end
 
-    End(["引擎準備就緒<br/>(Engine Ready)"]):::point
-
-    Start --> A1
-    A2 --> A3
-    A4 --> End
+    F_Sim -->|"請求裝置<br/>(Request Device)"| F_Bridge
+    F_Shared -->|"傳遞參數<br/>(Pass Params)"| F_Metal
 ```
 
 ```mermaid
 ---
-title: 子模組二：沉浸式空間與極限渲染迴圈 (Immersive Space & Render Loop)
+title: 3D 空間渲染與物理迴圈檔案架構 (3D Render Loop Files)
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
-    classDef initAction fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
-    classDef loopAction fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000;
-    classDef point fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#000;
-    classDef decision fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
+    classDef uiFile fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef modelFile fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#000;
+    classDef engineFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef action fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000;
 
-    Start(["點擊開啟粒子宇宙<br/>(Tap to Open Space)"]):::point
+    Start(["點擊進入空間<br/>(Enter 3D Space)"])
 
-    subgraph "階段四：沉浸式初始化 (Stage 4: Immersive Init)"
+    subgraph "階段四：載入 3D 資源 (Stage 4: Load 3D)"
         direction LR
-        B1(["載入模型與複製實體<br/>(Load & Clone Entities)"]):::initAction
-        B2(["建立隱形邊界框<br/>(Create Collision Box)"]):::initAction
-        B3(["啟動 ARKit 手部追蹤<br/>(Start Hand Tracking)"]):::initAction
-        B1 --> B2 --> B3
+        F_Imm[("ImmersiveView<br/>.swift")]:::uiFile
+        A1(["載入基礎模型<br/>(Load Model)"]):::action
+        F_Sphere[("Sphere.usda")]:::modelFile
+        F_Imm --> A1 --> F_Sphere
     end
 
-    subgraph "階段五：每秒 90 次渲染迴圈 (Stage 5: 90Hz Render Loop)"
-        direction LR
-        L1{"進入極限迴圈<br/>(Enter Render Loop)"}:::decision
-        C1(["擷取手勢與計算慣性<br/>(Hand Input & Inertia)"]):::loopAction
-        C2(["送交 GPU 平行物理運算<br/>(GPU Parallel Compute)"]):::loopAction
-        C3(["更新 3D 實體記憶體座標<br/>(Update 3D Coordinates)"]):::loopAction
+    subgraph "階段五：每秒 90 次互動 (Stage 5: 90Hz Loop)"
+        direction TB
+        A2(["讀取手勢與慣性<br/>(Input & Inertia)"]):::action
+        F_Sim[("ParticleSimulator<br/>.swift")]:::engineFile
+        A3(["平行物理運算<br/>(Parallel Compute)"]):::action
+        F_Metal[("ParticleCompute<br/>.metal")]:::engineFile
         
-        L1 --> C1 --> C2 --> C3 --> L1
+        A2 --> F_Sim --> A3 --> F_Metal
     end
 
-    Start --> B1
-    B3 --> L1
+    Start --> F_Imm
+    F_Sphere -->|"啟動迴圈<br/>(Start Loop)"| A2
+    F_Metal -->|"更新實體座標<br/>(Update Entities)"| F_Imm
 ```
 
 ---
