@@ -3,7 +3,7 @@ import SwiftUI
 struct ControlPanelView: View {
     @Environment(ParticleSimulator.self) private var simulator
     
-    @State private var particleCount: Double = 2500
+    @State private var particleCount: Double = 1500
     @State private var numTypes: Double = 6
     @State private var particleScale: Double = 0.015
     // 【新增】摩擦力的狀態
