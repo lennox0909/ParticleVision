@@ -14,28 +14,56 @@
 
 本專案採用清晰的架構，將 UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
 
-```markdown
-particle-vision/
-├── README.md                                 # 專案說明文件
-├── Simulation/                               # 核心大腦與 GPU 運算層
-│   ├── ParticleSimulator.swift               # 管理 Metal 狀態、雙重緩衝區排序與空間慣性運算
-│   ├── particle-vision-Bridging-Header.h     # Swift 與 Metal 的橋接標頭檔
-│   ├── ParticleCompute.metal                 # GPU Compute Shader：極致效能的網格排序與引力矩陣
-│   └── SharedTypes.h                         # Swift 與 Metal 共用的資料結構與參數定義
-├── particle-vision/                          # UI 介面與 RealityKit 渲染層
-│   ├── Resources/                            # 資源資料夾
-│   ├── AppModel.swift                        # 應用程式全域狀態模型
-│   ├── Assets.xcassets                       # 圖片與色彩等靜態資源
-│   ├── ContentView.swift                     # 主視窗容器
-│   ├── ControlPanelView.swift                # SwiftUI 參數調整介面 (數量、種類、大小、摩擦力)
-│   ├── ImmersiveView.swift                   # 沉浸式空間視圖，負責 RealityKit 實體渲染與骨架追蹤
-│   ├── Info.plist                            # 專案設定檔
-│   ├── ParticleVisionApp.swift               # App 進入點，配置視窗大小與註冊 ImmersiveSpace
-│   ├── SimulationSettings.swift              # 模擬器參數設定模型
-│   ├── Sphere.usda                           # 粒子的基礎 3D 原始模型
-│   └── ToggleImmersiveSpaceButton.swift      # 控制進入/退出沉浸式空間的獨立按鈕元件
-└── particle-visionTests/                     # 單元測試模組
-    └── ParticleVisionTests.swift             # 測試腳本
+```text
+.
+├── particle-vision                             // 應用程式主要原始碼目錄
+│   ├── AppModel.swift                          // 管理 App 全域狀態的資料模型
+│   ├── Assets.xcassets                         // 靜態資源檔 (圖片、顏色、App 圖示)
+│   │   ├── AccentColor.colorset              // 系統強調色設定
+│   │   │   └── Contents.json
+│   │   ├── AppIcon.solidimagestack           // visionOS 專用的 3D 多層次 App 圖示
+│   │   │   ├── Back.solidimagestacklayer     // 圖示背景層
+│   │   │   ├── Front.solidimagestacklayer    // 圖示前景層
+│   │   │   └── Middle.solidimagestacklayer   // 圖示中間層
+│   │   │   └── Contents.json
+│   │   └── Contents.json
+│   ├── ContainerDragGesture.swift.swift        // [重構] 單手拖曳與旋轉宇宙的手勢修飾器 (ViewModifier)
+│   ├── ContainerMagnifyGesture.swift           // [重構] 雙手捏合縮放宇宙的手勢修飾器
+│   ├── ContentView.swift                       // 2D 主視窗介面 (包含標題與控制面板)
+│   ├── ControlPanelView.swift                  // 粒子參數控制面板 UI (調整摩擦力、數量等)
+│   ├── Entity+Extensions.swift                 // [重構] RealityKit 實體工具擴充 (繪製邊框、尋找子節點)
+│   ├── ImmersiveView.swift                     // 3D 沉浸式空間主視圖 (極度簡化的核心視圖)
+│   ├── ImmersiveView+HandTracking.swift        // [重構] ARKit 手部追蹤與物理慣性推擠邏輯
+│   ├── ImmersiveView+Particles.swift           // [重構] RealityKit 視覺實體生成與 GPU 座標同步邏輯
+│   ├── Info.plist                              // App 系統設定檔 (權限與屬性)
+│   ├── ParticleVisionApp.swift                 // App 進入點 (註冊 WindowGroup 與 ImmersiveSpace)
+│   ├── Resources                               // 預設的 3D 資源資料夾
+│   │   ├── Immersive.usda                      // 預設 3D 場景
+│   │   ├── Materials                           
+│   │   │   └── GridMaterial.usda               // 網格材質設定
+│   │   └── Scene.usda                          // 預設場景
+│   ├── SimulationSettings.swift                // UI 綁定用的模擬器設定檔
+│   ├── Sphere.usda                             // 作為粒子視覺模板的 3D 圓球模型
+│   └── ToggleImmersiveSpaceButton.swift        // [重構] 開啟/關閉 3D 粒子宇宙的獨立按鈕元件
+├── particle-vision.xcodeproj                   // Xcode 專案檔 (管理編譯設定與檔案參照)
+│   ├── project.pbxproj
+│   └── project.xcworkspace
+│       ├── contents.xcworkspacedata
+│       └── xcshareddata
+│           └── swiftpm
+│               └── configuration
+├── particle-visionTests                        // 單元測試與 UI 測試目錄
+│   └── ParticleVisionTests.swift
+├── README.md                                   // 專案說明文件
+└── Simulation                                  // [重構] 核心物理模擬與 Metal GPU 運算模組
+    ├── GridSorting.metal                       // [重構] Metal 空間網格劃分、計數與排序著色器
+    ├── particle-vision-Bridging-Header.h       // Swift 與 Objective-C/Metal 溝通的橋接標頭檔
+    ├── ParticlePhysics.metal                   // [重構] Metal 粒子吸引排斥規則與邊界碰撞著色器
+    ├── ParticleSimulator.swift                 // [重構] 管理模擬器狀態與 GPU 緩衝區的主類別 (@Observable)
+    ├── ParticleSimulator+Metal.swift           // [重構] 封裝 Metal Pipeline 初始化與運算指令派發的擴充
+    ├── ParticleTypes.h                         // [重構] Metal 著色器共用的資料結構 (Structs) 與輔助函式
+    ├── SharedTypes.h                           // 定義 Swift 與 Metal 共用的記憶體對齊資料結構
+    └── SimulationModels.swift                  // [重構] Swift 端的基礎資料模型 (Particle, SimParams)
 ```
 
 
