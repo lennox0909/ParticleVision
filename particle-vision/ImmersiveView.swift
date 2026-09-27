@@ -30,8 +30,19 @@ struct ImmersiveView: View {
             // ✨ 改用 Entity+Extensions 提供的優雅語法
             containerBox.addBoxEdges(size: boxSize)
             
-            containerBox.scale = SIMD3<Float>(repeating: 0.1)
-            containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
+            // ✨ 讀取儲存的縮放比例，若無則使用預設值
+            if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
+                containerBox.scale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
+            } else {
+                containerBox.scale = SIMD3<Float>(repeating: 0.1)
+            }
+            
+            // ✨ 讀取儲存的空間位置，若無則使用預設值
+            if let savedPos = UserDefaults.standard.array(forKey: "BoxPosition") as? [Float], savedPos.count == 3 {
+                containerBox.position = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
+            } else {
+                containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
+            }
             
             containerBox.components.set(CollisionComponent(shapes: [.generateBox(size: [boxSize, boxSize, boxSize])]))
             containerBox.components.set(InputTargetComponent())
@@ -97,9 +108,8 @@ struct ImmersiveView: View {
         }
         // ✨ 新增：監聽螢光開關，一旦切換就呼叫剛剛寫好的材質更新函式
         .onChange(of: simulator.glowIntensity) { _, _ in
-                    updateParticleMaterials()
+            updateParticleMaterials()
         }
-        
         .onDisappear {
             frameSubscription?.cancel()
             frameSubscription = nil

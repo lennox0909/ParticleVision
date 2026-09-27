@@ -18,7 +18,7 @@ struct ContainerDragGestureModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 0.0)
                     .targetedToAnyEntity()
                     .onChanged { value in
                         // 如果正在進行雙手縮放，則忽略單手拖曳旋轉
