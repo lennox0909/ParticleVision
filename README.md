@@ -85,87 +85,88 @@ particle-vision/
 4. **移動與物理擾動**：單手捏合 (Pinch) 邊界盒子的任何一處並拖曳，即可像拿著網子一樣在空間中撈取、撞擊這些粒子！
 
 ---
-## Under the Hood
+## ⚙️ Under the Hood
+- 在 Apple Vision Pro 的主畫面點擊 App 的圖示後，系統會依照以下的時間序（Chronological Order）載入檔案、建立相依性，並調用對應的硬體資源：
 
-當你在 Apple Vision Pro 的主畫面點擊這個 App 的圖示後，系統會依照以下的時間序（Chronological Order）載入檔案、建立相依性，並調用對應的硬體資源：
-
-### **階段零：作業系統預載 (OS Pre-launch)**
+### **階段 0️⃣：作業系統預載 (OS Pre-launch)**
 
 在任何 Swift 程式碼執行之前，visionOS 會先讀取靜態設定檔與資源。
 
-* **相依檔案**：Info.plist、Assets.xcassets  
-* **功能**：系統讀取 Info.plist 來確認 App 的基本屬性（例如預設視窗大小、是否需要 ARKit 雙手追蹤權限等），並預先將 Assets.xcassets 內的圖示與靜態色彩載入記憶體。  
-* **硬體資源**：儲存空間 (Storage) \-\> 主記憶體 (RAM)。
+- **相依檔案**：Info.plist、Assets.xcassets  
+- **功能**：系統讀取 Info.plist 來確認 App 的基本屬性（例如預設視窗大小、是否需要 ARKit 雙手追蹤權限等），並預先將 Assets.xcassets 內的圖示與靜態色彩載入記憶體。  
+- **硬體資源**：儲存空間 (Storage) \-\> 主記憶體 (RAM)。
 
-### **階段一：App 啟動與全域狀態初始化**
+### **階段 1️⃣：App 啟動與全域狀態初始化**
 
 程式碼正式開始執行，建立整個 App 的生命週期與資料大腦。
 
-* **觸發檔案**：ParticleVisionApp.swift (標註 @main 的進入點)  
-* **相依檔案**：AppModel.swift、SimulationSettings.swift、ParticleSimulator.swift  
-* **功能**：  
+- **觸發檔案**：ParticleVisionApp.swift (標註 @main 的進入點)  
+- **相依檔案**：AppModel.swift、SimulationSettings.swift、ParticleSimulator.swift  
+- **功能**：  
   1. ParticleVisionApp.swift 被喚醒，宣告一個 WindowGroup (2D 視窗) 與一個 ImmersiveSpace (3D 空間)。  
   2. 它會實體化全域狀態模型（如 AppModel 或直接實體化 ParticleSimulator），將其作為 @Environment 注入到整個 App 的環境中，確保所有的 UI 與 3D 視圖都共用同一個「物理大腦」。  
-* **硬體資源**：CPU (負責執行初始化邏輯)、主記憶體 RAM (配置全域變數的記憶體空間)。
+- **硬體資源**：CPU (負責執行初始化邏輯)、主記憶體 RAM (配置全域變數的記憶體空間)。
 
-### **階段二：Metal 物理引擎與 GPU 資源分配 (核心關鍵)**
+### **階段 2️⃣：Metal 物理引擎與 GPU 資源分配 (核心關鍵)**
 
 在 ParticleSimulator.swift 被初始化的瞬間，它會立刻與底層的顯示卡 (GPU) 建立極速通訊通道。
 
-* **觸發檔案**：ParticleSimulator.swift 的 init()  
-* **相依檔案**：SharedTypes.h、particle-vision-Bridging-Header.h、ParticleCompute.metal  
-* **功能**：  
+- **觸發檔案**：ParticleSimulator.swift 的 init()  
+- **相依檔案**：SharedTypes.h、particle-vision-Bridging-Header.h、ParticleCompute.metal  
+- **功能**：  
   1. **橋接編譯**：透過 Bridging-Header 與 SharedTypes.h，Swift 確保了 CPU 端的 Particle 與 Cell 結構體記憶體對齊（16-bytes padding），與 GPU 端完全一致。  
   2. **獲取 GPU 權限**：ParticleSimulator 向系統請求 MTLCreateSystemDefaultDevice()。  
   3. **編譯 Shader**：讀取並編譯 ParticleCompute.metal 中的 5 個 Kernel 函數（清空、計數、前綴和、排序、運算），建立 MTLComputePipelineState。  
   4. **分配 VRAM**：在 GPU 的 Private 與 Shared 記憶體區塊中，開闢 particleBuffer 與 gridBuffer 等雙重緩衝區。  
-* **硬體資源**：GPU 控制器、統一記憶體架構 (Unified Memory \- 同時給 CPU/GPU 存取的高速 RAM)。
+- **硬體資源**：GPU 控制器、統一記憶體架構 (Unified Memory \- 同時給 CPU/GPU 存取的高速 RAM)。
 
-### **階段三：2D 控制面板渲染**
+### **階段 3️⃣：2D 控制面板渲染**
 
 物理大腦準備就緒後，系統開始繪製使用者看得到的懸浮玻璃視窗。
 
-* **觸發檔案**：ContentView.swift  
-* **相依檔案**：ControlPanelView.swift、ToggleImmersiveSpaceButton.swift  
-* **功能**：  
+- **觸發檔案**：ContentView.swift  
+- **相依檔案**：ControlPanelView.swift、ToggleImmersiveSpaceButton.swift  
+- **功能**：  
   1. ContentView 排版主視覺，並嵌入子元件。  
   2. ControlPanelView 讀取 ParticleSimulator 中的狀態（如 2500顆、摩擦力 0.95），並繪製拉桿 (Slider)。當使用者拖曳拉桿時，它會直接修改 Simulator 的參數。  
   3. ToggleImmersiveSpaceButton 準備好監聽使用者的點擊事件，用來開啟 3D 空間。  
-* **硬體資源**：CPU (計算 SwiftUI 佈局)、GPU (渲染 2D 玻璃材質與文字)、顯示器 (Display)。
+- **硬體資源**：CPU (計算 SwiftUI 佈局)、GPU (渲染 2D 玻璃材質與文字)、顯示器 (Display)。
 
-### **階段四：進入沉浸式空間與 ARKit 啟動**
+### **階段 4️⃣：進入沉浸式空間與 ARKit 啟動**
 
 使用者點擊「開啟粒子宇宙」按鈕，App 正式從 2D 跨入 3D 空間運算。
 
-* **觸發檔案**：ImmersiveView.swift  
-* **相依檔案**：Sphere.usda、ParticleSimulator.swift  
-* **功能**：  
+- **觸發檔案**：ImmersiveView.swift  
+- **相依檔案**：Sphere.usda、ParticleSimulator.swift  
+- **功能**：  
   1. **載入 3D 模型**：從 Resources 載入 Sphere.usda 作為基礎，RealityKit 在記憶體中快速複製 (Clone) 出 2500 顆實體 (Entity)，並依據 originalIndex 賦予材質顏色。  
   2. **建立隱形邊界**：生成一個帶有 CollisionComponent 的透明 Wireframe 邊界框，用來接收使用者的碰撞。  
   3. **啟動 ARKit 手勢追蹤**：向系統請求 HandTrackingProvider，開始掃描使用者的雙手骨架節點 (findPinchingHand)。  
-* **硬體資源**：  
-  * **GPU**：啟動 RealityKit 3D 渲染引擎。  
-  * **ARKit 專屬硬體**：外部攝影機 (追蹤手部影像)、光學雷達 LiDAR / 深度感測器 (建構空間深度)。  
-  * **神經網路引擎 (Neural Engine)**：以極低功耗執行機器學習模型，即時辨識雙手 25 個關節的精確 3D 座標。
+- **硬體資源**：  
+  - **GPU**：啟動 RealityKit 3D 渲染引擎。  
+  - **ARKit 專屬硬體**：外部攝影機 (追蹤手部影像)、光學雷達 LiDAR / 深度感測器 (建構空間深度)。  
+  - **神經網路引擎 (Neural Engine)**：以極低功耗執行機器學習模型，即時辨識雙手 25 個關節的精確 3D 座標。
 
-### **階段五：每秒 90 次的極限模擬迴圈 (The Render Loop)**
+### **階段 5️⃣：每秒 90 次的極限模擬迴圈 (The Render Loop)**
 
 這是 App 運行時持續發生的動作，也是專案中最吃重硬體效能的階段。
 
-* **交互循環**：ImmersiveView 🔄 ParticleSimulator 🔄 ParticleCompute.metal  
-* **功能運作 (以 1 幀為例，每秒發生 90 次)**：  
+- **交互循環**：ImmersiveView 🔄 ParticleSimulator 🔄 ParticleCompute.metal  
+- **功能運作 (以 1 幀為例，每秒發生 90 次)**：  
   1. **輸入擷取 (CPU/ARKit)**：ImmersiveView 讀取最新的手部 Pinch 座標，計算出邊界盒子的位移矩陣。  
   2. **空間慣性 (CPU)**：ParticleSimulator 執行 applyInertia，將盒子的相對位移套用到所有粒子的座標上（撈魚網物理學）。  
   3. **發送運算指令 (CPU \-\> GPU)**：updateSimulation() 將 5 個運算步驟（包含 memoryBarrier 保護）打包成 Command Buffer 送交 GPU 佇列。  
   4. **平行物理運算 (GPU)**：ParticleCompute.metal 喚醒數千個 GPU 執行緒，在一瞬間完成 2500 顆粒子的網格排序、碰撞偵測與引力計算。  
   5. **畫面更新 (CPU/GPU)**：ImmersiveView 透過 originalIndex 從 GPU 排好序的記憶體中讀出最新座標，更新 RealityKit 的 2500 個 Entity，最終由合成器 (Compositor) 輸出到雙眼螢幕。  
-* **硬體資源**：  
-  * **CPU**：負責邏輯調度、矩陣相乘、與 ARKit 溝通。  
-  * **GPU Compute Cores (運算核心)**：滿載執行 Spatial Hashing 與浮點數運算。  
-  * **高頻寬記憶體匯流排**：CPU 與 GPU 之間每秒進行 90 次的高速資料交換。  
-  * **雙眼 Micro-OLED 螢幕**：以 90Hz 的更新率渲染出具備空間感的立體畫面。
+- **硬體資源**：  
+  - **CPU**：負責邏輯調度、矩陣相乘、與 ARKit 溝通。  
+  - **GPU Compute Cores (運算核心)**：滿載執行 Spatial Hashing 與浮點數運算。  
+  - **高頻寬記憶體匯流排**：CPU 與 GPU 之間每秒進行 90 次的高速資料交換。  
+  - **雙眼 Micro-OLED 螢幕**：以 90Hz 的更新率渲染出具備空間感的立體畫面。
 
-## Flowchart
+## 🧭 Flowchart
+
+### 🕶️ 啟動與 2D 介面載入 (App Launch & 2D UI)
 
 ```mermaid
 ---
@@ -203,6 +204,8 @@ flowchart TD
     F_Model -->|"觸發<br/>(Trigger)"| F_Content
 ```
 
+### 💎 Metal 物理引擎與檔案關聯 (Metal Engine & Files)
+
 ```mermaid
 ---
 title: Metal 物理引擎與檔案關聯 (Metal Engine & Files)
@@ -215,7 +218,6 @@ flowchart TD
     classDef action fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
     F_Sim[("ParticleSimulator<br/>.swift")]:::swiftFile
-
     subgraph "C/C++ 橋接層 (Bridging Layer)"
         direction LR
         F_Bridge[("Bridging-Header.h")]:::headerFile
@@ -235,6 +237,8 @@ flowchart TD
     F_Sim -->|"請求裝置<br/>(Request Device)"| F_Bridge
     F_Shared -->|"傳遞參數<br/>(Pass Params)"| F_Metal
 ```
+
+### 🚀 3D 空間渲染與物理迴圈檔案架構 (3D Render Loop Files)
 
 ```mermaid
 ---
