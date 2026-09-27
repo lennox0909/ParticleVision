@@ -96,6 +96,31 @@ particle-vision/
 - **功能**：系統讀取 Info.plist 來確認 App 的基本屬性（例如預設視窗大小、是否需要 ARKit 雙手追蹤權限等），並預先將 Assets.xcassets 內的圖示與靜態色彩載入記憶體。  
 - **硬體資源**：儲存空間 (Storage) \-\> 主記憶體 (RAM)。
 
+```mermaid
+---
+title: 階段零：作業系統預載 (Stage 0: OS Pre-launch)
+---
+flowchart TD
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
+    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+    classDef startEnd fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000,rx:10,ry:10;
+
+    S(["作業系統啟動<br/>(OS Launch)"]):::startEnd
+    
+    subgraph "靜態資源讀取 (Static Resource Load)"
+        direction LR
+        F_Plist[("Info.plist")]:::fileNode
+        A1(["確認 App 屬性與權限<br/>(Check App Props)"]):::action
+        
+        F_Assets[("Assets.xcassets")]:::fileNode
+        A2(["預載圖示與色彩<br/>(Preload Assets)"]):::action
+    end
+
+    S --> F_Plist --> A1
+    S --> F_Assets --> A2
+```
+
 ### **階段 1️⃣：App 啟動與全域狀態初始化**
 
 程式碼正式開始執行，建立整個 App 的生命週期與資料大腦。
@@ -106,6 +131,37 @@ particle-vision/
   1. ParticleVisionApp.swift 被喚醒，宣告一個 WindowGroup (2D 視窗) 與一個 ImmersiveSpace (3D 空間)。  
   2. 它會實體化全域狀態模型（如 AppModel 或直接實體化 ParticleSimulator），將其作為 @Environment 注入到整個 App 的環境中，確保所有的 UI 與 3D 視圖都共用同一個「物理大腦」。  
 - **硬體資源**：CPU (負責執行初始化邏輯)、主記憶體 RAM (配置全域變數的記憶體空間)。
+
+```mermaid
+---
+title: 階段一：App 啟動與全域狀態初始化 (Stage 1: App Launch & State Init)
+---
+flowchart TD
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
+    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+
+    F_App[("ParticleVisionApp<br/>.swift")]:::fileNode
+    A1(["宣告視窗與 3D 空間<br/>(Declare Window & Space)"]):::action
+
+    subgraph "全域狀態模型 (Global Models)"
+        direction LR
+        F_Model[("AppModel<br/>.swift")]:::fileNode
+        F_Set[("SimulationSettings<br/>.swift")]:::fileNode
+        F_Sim[("ParticleSimulator<br/>.swift")]:::fileNode
+    end
+
+    A2(["注入環境變數<br/>(Inject Environment)"]):::action
+
+    F_App --> A1
+    A1 --> F_Model
+    A1 --> F_Set
+    A1 --> F_Sim
+    
+    F_Model --> A2
+    F_Set --> A2
+    F_Sim --> A2
+```
 
 ### **階段 2️⃣：Metal 物理引擎與 GPU 資源分配 (核心關鍵)**
 
@@ -120,6 +176,40 @@ particle-vision/
   4. **分配 VRAM**：在 GPU 的 Private 與 Shared 記憶體區塊中，開闢 particleBuffer 與 gridBuffer 等雙重緩衝區。  
 - **硬體資源**：GPU 控制器、統一記憶體架構 (Unified Memory \- 同時給 CPU/GPU 存取的高速 RAM)。
 
+```mermaid
+---
+title: 階段二：Metal 物理引擎與 GPU 資源分配 (Stage 2: Metal & GPU Alloc)
+---
+flowchart TD
+    classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
+    classDef swiftFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef metalFile fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+    classDef headerFile fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
+    classDef action fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
+
+    F_Sim[("ParticleSimulator<br/>.swift")]:::swiftFile
+    A1(["請求獲取 GPU 權限<br/>(Request GPU Device)"]):::action
+
+    subgraph "橋接層 (Bridging Layer)"
+        direction LR
+        F_Bridge[("Bridging-Header.h")]:::headerFile
+        A2(["結構體記憶體對齊<br/>(Memory Alignment)"]):::action
+        F_Shared[("SharedTypes.h")]:::headerFile
+        F_Bridge --> A2 --> F_Shared
+    end
+
+    subgraph "GPU 運算層 (GPU Compute)"
+        direction LR
+        F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
+        A3(["編譯 5 個 Kernel 函數<br/>(Compile Kernels)"]):::action
+        A4(["開闢雙重緩衝區<br/>(Alloc VRAM Buffers)"]):::action
+        F_Metal --> A3 --> A4
+    end
+
+    F_Sim --> A1 --> F_Bridge
+    F_Shared --> F_Metal
+```
+
 ### **階段 3️⃣：2D 控制面板渲染**
 
 物理大腦準備就緒後，系統開始繪製使用者看得到的懸浮玻璃視窗。
@@ -131,6 +221,34 @@ particle-vision/
   2. ControlPanelView 讀取 ParticleSimulator 中的狀態（如 2500顆、摩擦力 0.95），並繪製拉桿 (Slider)。當使用者拖曳拉桿時，它會直接修改 Simulator 的參數。  
   3. ToggleImmersiveSpaceButton 準備好監聽使用者的點擊事件，用來開啟 3D 空間。  
 - **硬體資源**：CPU (計算 SwiftUI 佈局)、GPU (渲染 2D 玻璃材質與文字)、顯示器 (Display)。
+
+```mermaid
+---
+title: 階段三：2D 控制面板渲染 (Stage 3: 2D UI Render)
+---
+flowchart TD
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
+    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+
+    F_Content[("ContentView<br/>.swift")]:::fileNode
+    A1(["排版主視覺容器<br/>(Layout Main View)"]):::action
+
+    subgraph "子元件 (Sub-components)"
+        direction TB
+        F_Panel[("ControlPanelView<br/>.swift")]:::fileNode
+        A2(["繪製拉桿並綁定參數<br/>(Draw Sliders & Bind)"]):::action
+        F_Panel --> A2
+        
+        F_Btn[("ToggleImmersive<br/>SpaceButton.swift")]:::fileNode
+        A3(["監聽點擊事件準備切換<br/>(Listen for Tap)"]):::action
+        F_Btn --> A3
+    end
+
+    F_Content --> A1
+    A1 --> F_Panel
+    A1 --> F_Btn
+```
 
 ### **階段 4️⃣：進入沉浸式空間與 ARKit 啟動**
 
@@ -146,6 +264,39 @@ particle-vision/
   - **GPU**：啟動 RealityKit 3D 渲染引擎。  
   - **ARKit 專屬硬體**：外部攝影機 (追蹤手部影像)、光學雷達 LiDAR / 深度感測器 (建構空間深度)。  
   - **神經網路引擎 (Neural Engine)**：以極低功耗執行機器學習模型，即時辨識雙手 25 個關節的精確 3D 座標。
+  
+```mermaid
+---
+title: 階段四：進入沉浸式空間與 ARKit 啟動 (Stage 4: Immersive & ARKit Init)
+---
+flowchart TD
+    classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
+    classDef uiFile fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef modelFile fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#000;
+    classDef engineFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef action fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000;
+
+    F_Imm[("ImmersiveView<br/>.swift")]:::uiFile
+
+    subgraph "3D 資源載入 (3D Asset Load)"
+        direction LR
+        F_Sphere[("Sphere.usda")]:::modelFile
+        A1(["複製 2500 顆實體<br/>(Clone Entities)"]):::action
+        A2(["建立隱形邊界框<br/>(Create Collision Box)"]):::action
+        F_Sphere --> A1 --> A2
+    end
+
+    subgraph "ARKit 啟動 (ARKit Launch)"
+        direction LR
+        A3(["請求手部骨架追蹤<br/>(Request Hand Tracking)"]):::action
+        F_Sim[("ParticleSimulator<br/>.swift")]:::engineFile
+        A4(["準備接收物理座標<br/>(Ready Physics Input)"]):::action
+        A3 --> F_Sim --> A4
+    end
+
+    F_Imm --> F_Sphere
+    F_Imm --> A3
+```
 
 ### **階段 5️⃣：每秒 90 次的極限模擬迴圈 (The Render Loop)**
 
@@ -163,118 +314,49 @@ particle-vision/
   - **GPU Compute Cores (運算核心)**：滿載執行 Spatial Hashing 與浮點數運算。  
   - **高頻寬記憶體匯流排**：CPU 與 GPU 之間每秒進行 90 次的高速資料交換。  
   - **雙眼 Micro-OLED 螢幕**：以 90Hz 的更新率渲染出具備空間感的立體畫面。
-
-## 🧭 Flowchart
-
-### 🕶️ 啟動與 2D 介面載入 (App Launch & 2D UI)
-
+  
 ```mermaid
 ---
-title: 啟動與 2D 介面載入 (App Launch & 2D UI)
----
-flowchart TD
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
-    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef action fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef stage fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#000;
-
-    S(["系統點擊啟動<br/>(App Icon Tapped)"]):::stage
-
-    subgraph "階段零與階段一 (Stage 0 & 1)"
-        direction LR
-        F_Plist[("Info.plist &<br/>Assets.xcassets")]:::fileNode
-        A1(["讀取設定預載資源<br/>(Load Config & Assets)"]):::action
-        F_App[("ParticleVisionApp<br/>.swift")]:::fileNode
-        F_Model[("AppModel &<br/>SimulationSettings")]:::fileNode
-        
-        F_Plist --> A1 --> F_App --> F_Model
-    end
-
-    subgraph "階段三：介面渲染 (Stage 3: UI)"
-        direction LR
-        F_Content[("ContentView<br/>.swift")]:::fileNode
-        F_Panel[("ControlPanelView<br/>.swift")]:::fileNode
-        F_Btn[("ToggleImmersive<br/>SpaceButton.swift")]:::fileNode
-        
-        F_Content --> F_Panel
-        F_Content --> F_Btn
-    end
-
-    S --> F_Plist
-    F_Model -->|"觸發<br/>(Trigger)"| F_Content
-```
-
-### 💎 Metal 物理引擎與檔案關聯 (Metal Engine & Files)
-
-```mermaid
----
-title: Metal 物理引擎與檔案關聯 (Metal Engine & Files)
----
-flowchart TD
-    classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
-    classDef swiftFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
-    classDef metalFile fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
-    classDef headerFile fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
-    classDef action fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
-
-    F_Sim[("ParticleSimulator<br/>.swift")]:::swiftFile
-    subgraph "C/C++ 橋接層 (Bridging Layer)"
-        direction LR
-        F_Bridge[("Bridging-Header.h")]:::headerFile
-        F_Shared[("SharedTypes.h")]:::headerFile
-        A1(["定義共用結構對齊<br/>(Memory Alignment)"]):::action
-        F_Bridge --> A1 --> F_Shared
-    end
-
-    subgraph "GPU 著色器層 (GPU Shader Layer)"
-        direction LR
-        F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
-        A2(["編譯 5 個 Kernel 函數<br/>(Compile Kernels)"]):::action
-        A3(["分配雙重緩衝區<br/>(Alloc Dual Buffers)"]):::action
-        F_Metal --> A2 --> A3
-    end
-
-    F_Sim -->|"請求裝置<br/>(Request Device)"| F_Bridge
-    F_Shared -->|"傳遞參數<br/>(Pass Params)"| F_Metal
-```
-
-### 🚀 3D 空間渲染與物理迴圈檔案架構 (3D Render Loop Files)
-
-```mermaid
----
-title: 3D 空間渲染與物理迴圈檔案架構 (3D Render Loop Files)
+title: 階段五：每秒 90 次的極限模擬迴圈 (Stage 5: 90Hz Render Loop)
 ---
 flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
     classDef uiFile fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef modelFile fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#000;
     classDef engineFile fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef metalFile fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
     classDef action fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000;
+    classDef loop fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
-    Start(["點擊進入空間<br/>(Enter 3D Space)"])
+    L(["開始 90Hz 迴圈<br/>(Start 90Hz Loop)"]):::loop
 
-    subgraph "階段四：載入 3D 資源 (Stage 4: Load 3D)"
-        direction LR
-        F_Imm[("ImmersiveView<br/>.swift")]:::uiFile
-        A1(["載入基礎模型<br/>(Load Model)"]):::action
-        F_Sphere[("Sphere.usda")]:::modelFile
-        F_Imm --> A1 --> F_Sphere
-    end
-
-    subgraph "階段五：每秒 90 次互動 (Stage 5: 90Hz Loop)"
+    subgraph "輸入與 CPU 運算 (Input & CPU Math)"
         direction TB
-        A2(["讀取手勢與慣性<br/>(Input & Inertia)"]):::action
+        F_Imm[("ImmersiveView<br/>.swift")]:::uiFile
+        A1(["讀取手部 Pinch 座標<br/>(Get Hand Coordinates)"]):::action
         F_Sim[("ParticleSimulator<br/>.swift")]:::engineFile
-        A3(["平行物理運算<br/>(Parallel Compute)"]):::action
-        F_Metal[("ParticleCompute<br/>.metal")]:::engineFile
+        A2(["計算空間慣性位移<br/>(Apply Inertia)"]):::action
+        A3(["發送 GPU 運算指令<br/>(Send GPU Commands)"]):::action
         
-        A2 --> F_Sim --> A3 --> F_Metal
+        F_Imm --> A1 --> F_Sim --> A2 --> A3
     end
+    
+    subgraph "GPU 平行處理 (GPU Parallel)"
+        direction TB
+        F_Metal[("ParticleCompute<br/>.metal")]:::metalFile
+        A4(["GPU 網格排序與引力<br/>(GPU Parallel Compute)"]):::action
+        F_Metal --> A4
+    end
+    
+    A5(["更新 RealityKit 畫面<br/>(Update RealityKit)"]):::action
 
-    Start --> F_Imm
-    F_Sphere -->|"啟動迴圈<br/>(Start Loop)"| A2
-    F_Metal -->|"更新實體座標<br/>(Update Entities)"| F_Imm
+    L --> F_Imm
+    A3 --> F_Metal
+    A4 --> A5
+    A5 --> L
 ```
+
+### 💎 Metal 物理引擎與檔案關聯 (Metal Engine & Files)
+
 
 ---
 
