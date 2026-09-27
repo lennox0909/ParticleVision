@@ -54,7 +54,7 @@ class ParticleSimulator {
         didSet { updateRuleMatrixBuffer() }
     }
     
-    init(particleCount: Int = 2500, numTypes: Int = 6) {
+    init(particleCount: Int = 50000, numTypes: Int = 6) {
         self.particleCount = particleCount
         self.numTypes = numTypes
         self.params = SimParams(

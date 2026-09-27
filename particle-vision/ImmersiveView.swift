@@ -31,7 +31,7 @@ struct ImmersiveView: View {
             containerBox.addBoxEdges(size: boxSize)
             
             containerBox.scale = SIMD3<Float>(repeating: 0.1)
-            containerBox.position = SIMD3<Float>(0, 1.1, -0.7)
+            containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
             
             containerBox.components.set(CollisionComponent(shapes: [.generateBox(size: [boxSize, boxSize, boxSize])]))
             containerBox.components.set(InputTargetComponent())

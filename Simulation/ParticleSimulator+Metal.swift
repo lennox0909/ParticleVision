@@ -64,7 +64,9 @@ extension ParticleSimulator {
             paramsBuffer = device.makeBuffer(length: MemoryLayout<SimParams>.stride, options: .storageModeShared)
             updateParamsBuffer()
             
-            let gridBufferSize = 4096 * 16
+            // 原本: let gridBufferSize = 4096 * 16
+            // ✨ 修改為:
+            let gridBufferSize = 32768 * 16
             gridBuffer = device.makeBuffer(length: gridBufferSize, options: .storageModePrivate)
             
             setupMesh()
@@ -146,7 +148,7 @@ extension ParticleSimulator {
               let computeEncoder = commandBuffer.makeComputeCommandEncoder(),
               let mesh = lowLevelMesh else { return }
         
-        let numCells = 4096
+        let numCells = 32768
         var w = clearGridPipeline.maxTotalThreadsPerThreadgroup
         
         computeEncoder.setComputePipelineState(clearGridPipeline)

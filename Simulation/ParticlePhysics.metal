@@ -19,9 +19,9 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
             for (int x = -1; x <= 1; x++) {
                 int3 neighborCoords = int3(cellCoords) + int3(x, y, z);
 
-                if (neighborCoords.x < 0 || neighborCoords.x > 15 ||
-                    neighborCoords.y < 0 || neighborCoords.y > 15 ||
-                    neighborCoords.z < 0 || neighborCoords.z > 15) {
+                if (neighborCoords.x < 0 || neighborCoords.x > 31 ||
+                    neighborCoords.y < 0 || neighborCoords.y > 31 ||
+                    neighborCoords.z < 0 || neighborCoords.z > 31) {
                     continue;
                 }
 
