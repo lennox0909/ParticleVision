@@ -105,21 +105,10 @@ struct ImmersiveView: View {
             containerBox: containerBox,
             findPinchingHand: findPinchingHand
         )
-        .simultaneousGesture(
-            MagnifyGesture()
-                .targetedToAnyEntity()
-                .onChanged { value in
-                    isScaling = true
-                    activeHand = nil
-                    
-                    let entity = value.entity
-                    if scaleStart == nil { scaleStart = entity.scale }
-                    entity.scale = scaleStart! * Float(value.magnification)
-                }
-                .onEnded { _ in
-                    isScaling = false
-                    scaleStart = nil
-                }
+        .containerMagnifyGesture(
+            isScaling: $isScaling,
+            activeHand: $activeHand,
+            scaleStart: $scaleStart
         )
     }
     
