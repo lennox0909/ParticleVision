@@ -2,13 +2,8 @@ import SwiftUI
 import RealityKit
 
 struct ContentView: View {
-    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
-    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
-    @State private var isImmersiveSpaceOpen = false
-    
     var body: some View {
         VStack(spacing: 30) {
-
             
             Text("Particle Life 控制台")
                 .font(.extraLargeTitle)
@@ -16,20 +11,10 @@ struct ContentView: View {
             
             ControlPanelView()
             
-            Toggle(isImmersiveSpaceOpen ? "關閉粒子宇宙" : "開啟粒子宇宙", isOn: $isImmersiveSpaceOpen)
-                .toggleStyle(.button)
+            // 直接使用模組化的按鈕取代原本冗長的 Toggle 與 onChange 邏輯
+            ToggleImmersiveSpaceButton()
                 .padding(.top, 20)
         }
         .padding(40)
-        .onChange(of: isImmersiveSpaceOpen) { _, isOpen in
-            Task {
-                if isOpen {
-                    // 請確保此處的 ID 與 ParticleVisionApp.swift 中註冊的 ImmersiveSpace ID 相同
-                    await openImmersiveSpace(id: "ParticleSpace")
-                } else {
-                    await dismissImmersiveSpace()
-                }
-            }
-        }
     }
 }

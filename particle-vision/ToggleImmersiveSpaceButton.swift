@@ -14,8 +14,8 @@ struct ToggleImmersiveSpaceButton: View {
                     await dismissImmersiveSpace()
                     isShowingImmersiveSpace = false
                 } else {
-                    // 根據 App 中定義的 ID 開啟沉浸空間
-                    let result = await openImmersiveSpace(id: "ImmersiveSpace")
+                    // 確保這裡的 ID 與 ParticleVisionApp.swift 中註冊的 ImmersiveSpace ID 完全一致
+                    let result = await openImmersiveSpace(id: "ParticleSpace")
                     if case .opened = result {
                         isShowingImmersiveSpace = true
                     }
