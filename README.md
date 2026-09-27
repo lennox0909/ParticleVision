@@ -1,58 +1,82 @@
-# Particle Life: visionOS 空間運算版 🌌
+# 🌌 Particle Life visionOS
 
-本專案是將經典的「Particle Life (人工生命粒子模擬)」成功移植至 Apple Vision Pro (visionOS) 的重大效能突破版本。透過整合 Apple 的 GPU 運算與沉浸式空間，我們成功讓 5.4 萬顆粒子在實體環境中流暢互動。
+![Platform](https://img.shields.io/badge/Platform-visionOS-black?logo=apple)
+![Swift](https://img.shields.io/badge/Swift-5.9+-FA7343?logo=swift)
+![Metal](https://img.shields.io/badge/Technology-Metal%20%7C%20ARKit%20%7C%20RealityKit-blue)
 
-## 🚀 核心技術與亮點
+這是一個專為 Apple Vision Pro 打造的高效能「粒子生命 (Particle Life)」人工生命模擬器。
+透過結合 **Metal Compute Shader** 的極致 GPU 平行運算、**ARKit** 骨架手勢追蹤，以及 **RealityKit** 的沉浸式渲染，玩家可以直接用雙手在空間中「撈取」並擾動這個由數千顆微小粒子組成的浮游生態系。
 
-*   **極致效能 (5.4 萬顆粒子)**：跳脫傳統 $O(N^2)$ 的效能瓶頸，實作 **Spatial Hashing (空間網格)** 演算法。透過 27 個鄰近網格搜尋與 `max_per_cell = 64` 的限制，在 M5 晶片上達成滿幀率 (60+ FPS) 完美運行。
-*   **GPU 幾何展開與光影烘焙**：捨棄消耗 CPU 資源的實體生成，直接在 `ParticleCompute.metal` 中以幾何著色器 (Geometry Expansion) 將單一粒子展開為 **60 頂點的二十面體 (Icosahedron)**，生成總計超過 300 萬個頂點的精緻 3D 圓球。
-*   **物理材質與法線支援**：自訂 `RenderVertex` 結構 (32 Bytes)，將粒子位置與 3D 表面法線 (Normal) 傳遞給 RealityKit 的 `SimpleMaterial`，呈現出帶有環境光澤與立體陰影的彩色實體質感。
-*   **ARKit 雙手互動**：透過 `HandTrackingProvider` 追蹤雙手的三維空間座標，實作排斥力場 (Repulsion Field) 與邊界環境阻尼控制，讓使用者能用雙手直接撥開粒子群。
 
 ---
 
-## 📂 專案目錄結構與 Target Membership
+## 📂 專案結構 (Project Structure)
 
-在 Xcode 中新增檔案時，請確保右側 Inspector 面板的 `Target Membership` 設定正確，否則將導致編譯失敗或找不到資源：
+本專案採用清晰的架構，將 UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
 
 ```text
-ParticleVision/
-├── Simulation/
-│   ├── SharedTypes.h               # Target: 不需勾選 (C 標頭檔，由 Metal 與 Swift 橋接引用)
-│   ├── ParticleCompute.metal       # Target: ✅ 勾選 particle-vision (確保編譯入 GPU default.metallib)
-│   └── ParticleSimulator.swift     # Target: ✅ 勾選 particle-vision
-├── particle-vision/
-│   ├── ImmersiveView.swift         # Target: ✅ 勾選 particle-vision
-│   └── Info.plist                  # Target: 不需勾選 (於 Target 的 Build Settings 中綁定)
-└── README.md                       # Target: 不需勾選 (說明文件)
+ParticleLifeVisionOS/
+├── ParticleVisionApp.swift      # App 進入點，配置視窗大小與註冊 ImmersiveSpace
+├── Views/
+│   ├── ContentView.swift        # 主控制面板視窗容器，控制沉浸式空間的開關
+│   ├── ControlPanelView.swift   # SwiftUI 參數調整介面 (數量、種類、大小、摩擦力)
+│   └── ImmersiveView.swift      # 沉浸式空間視圖，負責 RealityKit 實體渲染與 ARKit 骨架追蹤
+├── PhysicsEngine/
+│   ├── ParticleSimulator.swift  # 核心大腦：管理 Metal 狀態、GPU 雙重緩衝區排序與空間慣性運算
+│   └── ParticleCompute.metal    # GPU Compute Shader：極致效能的網格空間排序、引力矩陣與邊界穿透推擠
+├── Resources/
+│   └── Sphere.usda              # 粒子的基礎 3D 原始模型 (被 RealityKit 遞迴複製與變色)
+└── README.md                    # 專案說明文件
 ```
 
 
+
+## ✨ 核心特色 (Key Features)
+
+### 🚀 突破極限的 GPU 物理運算 (Metal Compute Shader)
+- **空間雜湊 (Spatial Hashing)**：將 $O(N^2)$ 的碰撞複雜度降至 $O(N)$，確保海量粒子在三維空間中的運算效率。
+- **GPU 空間排序 (Spatial Sorting / Cache Locality)**：實作計數排序 (Counting Sort) 與前綴和 (Prefix Sum)，確保物理空間相近的粒子在 GPU 記憶體中也絕對連續，快取命中率 (Cache Hit Rate) 逼近 100%。
+- **嚴格的硬體層級防護**：利用 `memoryBarrier` 與 `16-byte` 記憶體強制對齊，解決了非同步運算造成的 Race Condition 與核心崩潰 (Kernel Panic)。
+
+### 🖐️ 沉浸式實體反饋 (Scoop Net Physics)
+- **撈魚網物理學**：不同於一般的平移，當使用者移動邊界盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
+- **精確骨架追蹤**：基於 ARKit 的手部骨架節點分析 (`findPinchingHand`)，實現穩定且無死角的單手 6-DOF 空間拖曳。
+
+### 🎛️ 即時動態控制面板 (SwiftUI)
+提供美觀且不裁切的空間浮動視窗，支援即時無縫調整以下參數：
+- **粒子數量**：動態增減 (100 ~ 4000 顆)，預設為 2500 顆最穩定。
+- **粒子種類**：支援 2 ~ 8 種不同屬性的粒子互相吸引/排斥 (預設 6 種)。
+- **空間摩擦力 (Friction)**：即時調整宇宙的「黏滯感」(0.70 泥漿阻力 ~ 0.99 太空滑行)。
+- **隨機引力規則**：一鍵重組基因矩陣，觀察全新的細胞群聚演化。
+
 ---
 
-## ⚙️ 關鍵專案設定 (Xcode Build Settings & Info.plist)
+## 🛠️ 技術細節 (Technical Details)
 
-為了確保專案能順利編譯並啟動沉浸式空間，請確認 Xcode 中的以下設定：
-
-### 1. Build Settings
-在專案的 `Build Settings` 標籤頁中，確認 Metal 編譯器版本：
-*   **Metal Language Revision:** `Metal 4.0`
-
-### 2. Info.plist (Application Scene Manifest)
-展開 `Information Property List`，確保 `Application Scene Manifest` 包含以下混合實境 (Mixed Reality) 的必要配置：
-
-*   **Enable Multiple Scenes:** `YES`
-*   **Preferred Default Scene Session Role:** `Window Application Session Role`
-*   **Scene Configuration**:
-    *   新增 `Immersive Space Application Session Role` (Array)
-    *   在該 Array 下建立 `Item 0` (Dictionary)
-    *   設定 **`Initial Immersion Style`** 為 **`Mixed Immersion`**
+本專案解決了 visionOS 開發中多個高難度的效能與渲染痛點：
+1. **解決 GPU 排序導致的顏色閃爍**：透過賦予粒子不變的 `originalIndex` (身分證)，成功解耦了 GPU 連續記憶體排序與 RealityKit Entity 之間的綁定關係。
+2. **無效能冗餘的邊界渲染**：拔除了耗能的毛玻璃 (Glass Shader) 實體，改用純數學計算的 12 道極細 Wireframe 框線，達成 **Zero GPU Overdraw** 的高幀率表現。
+3. **視窗完美適配**：透過自訂 `defaultSize` 與 `frame(minWidth:minHeight:)`，確保控制面板在任何狀態下皆不會被作業系統裁切。
 
 ---
 
-## 🛠️ 未來發展與實驗方向
+## 💻 系統需求 (Requirements)
 
-本架構擁有極高的效能餘裕，未來可進一步探索：
-1. 將粒子數量推升至 10 萬顆以上的極限壓力測試。
-2. 結合 `SceneReconstructionProvider` 讓粒子能與真實世界的牆壁或家具發生物理碰撞。
-3. 加入更多物種 (Types) 與動態調整引力/斥力參數的 UI 控制面板。
+* **硬體**: Apple Vision Pro (實機測試表現最佳) 或 visionOS Simulator
+* **系統**: visionOS 1.0+
+* **開發環境**: Xcode 15.2+ (請確保以 **Release Mode** 建置以獲得最佳物理模擬幀率)
+
+---
+
+## 🎮 如何操作 (How to Play)
+
+1. 點擊控制面板上的 **「開啟粒子宇宙」** 進入沉浸式空間。
+2. 觀賞粒子依據隨機生成的引力矩陣 (Attraction/Repulsion Matrix) 逐漸聚集成細胞、薄膜或蠕蟲等不可思議的形狀。
+3. **放大/縮小**：雙手同時使用放大手勢 (Magnify Gesture) 調整宇宙的整體尺寸。
+4. **移動與物理擾動**：單手捏合 (Pinch) 邊界盒子的任何一處並拖曳，即可像拿著網子一樣在空間中撈取、撞擊這些粒子！
+
+---
+
+## 📄 授權協議 (License)
+
+本專案採用 [MIT License](LICENSE) 授權。歡迎自由 Fork、修改與應用於你的 visionOS 專案中！
