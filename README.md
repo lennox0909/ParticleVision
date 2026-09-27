@@ -209,7 +209,7 @@ flowchart TD
 ---
 title: 子模組一：Metal 物理引擎與 GPU 資源分配 (Metal & GPU Init)
 ---
-flowchart LR
+flowchart TD
     classDef default fill:#fafafa,stroke:#333,stroke-width:2px,color:#333;
     classDef cpuAction fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
     classDef gpuAction fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
