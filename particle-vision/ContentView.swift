@@ -8,7 +8,7 @@ struct ContentView: View {
     
     var body: some View {
         VStack(spacing: 30) {
-            // 【刪除】原本的 "8000顆粒子的空間雜湊演化"
+
             
             Text("Particle Life 控制台")
                 .font(.extraLargeTitle)
