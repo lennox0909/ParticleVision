@@ -76,6 +76,9 @@ struct ImmersiveView: View {
             let subscription = content.subscribe(to: SceneEvents.Update.self) { _ in
                 guard !self.particleEntities.isEmpty else { return }
                 
+                // ✨ 新增：觸發 FPS 計算
+                simulator.updateFPS()
+                
                 // 1. 呼叫 ImmersiveView+HandTracking 裡的擴充方法
                 updateBoxWithHandTracking()
                 

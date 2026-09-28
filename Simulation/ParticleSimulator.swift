@@ -3,6 +3,7 @@ import Metal
 import simd
 import Observation
 import RealityKit
+import QuartzCore
 
 @Observable
 class ParticleSimulator {
@@ -31,6 +32,11 @@ class ParticleSimulator {
     var params: SimParams
     var particleCount: Int
     var numTypes: Int
+    
+    // ✨ 新增：FPS 相關狀態
+    var currentFPS: Int = 0
+    private var frameCount: Int = 0
+    private var lastFPSUpdateTime: TimeInterval = 0
     
     var needsVisualRebuild: Bool = false
     
@@ -117,4 +123,20 @@ class ParticleSimulator {
             pointer[i] = p
         }
     }
+    
+    func updateFPS() {
+            let currentTime = CACurrentMediaTime()
+            frameCount += 1
+            
+            // 每過 1 秒鐘，結算一次過去一秒內跑了幾幀
+            if currentTime - lastFPSUpdateTime >= 1.0 {
+                // 切換到 Main Thread 更新 UI 狀態
+                DispatchQueue.main.async {
+                    self.currentFPS = self.frameCount
+                    self.frameCount = 0
+                }
+                lastFPSUpdateTime = currentTime
+            }
+    }
+    
 }

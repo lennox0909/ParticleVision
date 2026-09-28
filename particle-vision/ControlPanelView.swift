@@ -3,14 +3,25 @@ import SwiftUI
 struct ControlPanelView: View {
     @Environment(ParticleSimulator.self) private var simulator
     
-    @State private var particleCount: Double = 50000
+    @State private var particleCount: Double = 100000
     @State private var numTypes: Double = 6
     @State private var particleScale: Double = 0.015
-    // 【新增】摩擦力的狀態
     @State private var friction: Double = 0.95
     
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
+            
+            // FPS 顯示面板
+            HStack {
+                Text("FPS:")
+                    .font(.headline)
+                Text("\(simulator.currentFPS)")
+                    .font(.system(.title2, design: .monospaced).bold())
+                    .foregroundColor(simulator.currentFPS >= 75 ? .green : (simulator.currentFPS >= 60 ? .yellow : .red))
+                Spacer()
+            }
+            .padding(.bottom, -5)
+            
             VStack(alignment: .leading) {
                 Text("粒子數量: \(Int(particleCount))")
                     .font(.headline)
@@ -32,7 +43,6 @@ struct ControlPanelView: View {
                     }
             }
             
-            // 【新增】空間摩擦力拉桿
             VStack(alignment: .leading) {
                 Text("空間摩擦力: \(String(format: "%.2f", friction))")
                     .font(.headline)
@@ -42,18 +52,15 @@ struct ControlPanelView: View {
                     }
             }
             
-            // ✨ 結合 Slider 與微調按鈕的發光強度控制
             @Bindable var bindableSimulator = simulator
             VStack(alignment: .leading) {
                 Text("螢光強度: \(String(format: "%.1f", simulator.glowIntensity))")
                     .font(.headline)
                 
                 HStack(spacing: 15) {
-                    // 設定範圍從 0 到 5，大範圍拖曳使用 Slider
                     Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.5)
                         .tint(.cyan)
                     
-                    // 點擊一次減 0.1，最低不小於 0
                     Button {
                         simulator.glowIntensity = max(0, simulator.glowIntensity - 0.1)
                     } label: {
@@ -62,7 +69,6 @@ struct ControlPanelView: View {
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.circle)
                     
-                    // 點擊一次加 0.1，最高不超過 5
                     Button {
                         simulator.glowIntensity = min(5, simulator.glowIntensity + 0.1)
                     } label: {
@@ -84,8 +90,8 @@ struct ControlPanelView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+            .padding(.top, 10)
         }
-        .padding(20)
-        .glassBackgroundEffect()
+        // ✨ 已移除這裡的 padding、frame 與 glassBackgroundEffect，交給外層處理
     }
 }
