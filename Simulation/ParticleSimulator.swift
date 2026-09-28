@@ -2,9 +2,15 @@ import Foundation
 import Metal
 import simd
 import Observation
+import RealityKit
 
 @Observable
 class ParticleSimulator {
+    // ✨ 新增這行：發光效果開關
+    var glowIntensity: Float = 0.0
+    var meshResource: MeshResource!
+    var lowLevelMesh: LowLevelMesh?
+    var updateMeshPipeline: MTLComputePipelineState!
     // 移除 private，讓 Extension 可以跨檔案存取
     var device: MTLDevice!
     var commandQueue: MTLCommandQueue!
@@ -49,7 +55,7 @@ class ParticleSimulator {
         didSet { updateRuleMatrixBuffer() }
     }
     
-    init(particleCount: Int = 2500, numTypes: Int = 6) {
+    init(particleCount: Int = 50000, numTypes: Int = 6) {
         self.particleCount = particleCount
         self.numTypes = numTypes
         self.params = SimParams(

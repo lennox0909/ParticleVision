@@ -4,7 +4,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-// 【修改】加入 originalIndex 來記憶原本在陣列中的位址
 struct Particle {
     float3 position;
     float3 velocity;
@@ -23,7 +22,6 @@ struct SimParams {
     uint particleCount;
 };
 
-// 強制對齊 16 bytes，防止 GPU 記憶體溢位
 struct Cell {
     atomic_uint count;
     uint startIndex;
@@ -31,13 +29,15 @@ struct Cell {
     uint padding;
 };
 
+// ✨ 修正 1：乘數從 4.0f 改為 8.0f (32格 / 4.0空間寬度 = 8.0)
 inline uint3 getCellCoords(float3 pos) {
     float3 p = clamp(pos + 2.0, 0.0f, 3.9999f);
-    return uint3(p * 4.0f);
+    return uint3(p * 8.0f);
 }
 
+// ✨ 修正 2：乘數改為 32 與 1024 (32 * 32)
 inline uint getCellIndex(uint3 coords) {
-    return coords.x + coords.y * 16 + coords.z * 256;
+    return coords.x + coords.y * 32 + coords.z * 1024;
 }
 
 #endif /* ParticleTypes_h */

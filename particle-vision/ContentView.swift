@@ -3,18 +3,25 @@ import RealityKit
 
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 30) {
-            
-            Text("Particle Life 控制台")
-                .font(.extraLargeTitle)
-                .fontWeight(.bold)
-            
-            ControlPanelView()
-            
-            // 直接使用模組化的按鈕取代原本冗長的 Toggle 與 onChange 邏輯
-            ToggleImmersiveSpaceButton()
-                .padding(.top, 20)
+        ScrollView {
+            VStack(spacing: 30) {
+                
+                Text("Particle Life 控制台")
+                    .font(.extraLargeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, 20)
+                
+                ControlPanelView()
+                
+                ToggleImmersiveSpaceButton()
+                    .padding(.bottom, 20)
+            }
+            // 1. 加回內縮間距，讓元件不會貼死在玻璃邊緣
+            .padding(40)
+            // 2. 強制 VStack 內的元件從最上方開始排列，避免跑版
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .padding(40)
+        // 3. 改用明確的寬高，避免 minHeight 過大導致系統裁切畫面頂部
+        .frame(width: 600, height: 800)
     }
 }

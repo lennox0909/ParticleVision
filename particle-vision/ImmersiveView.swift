@@ -30,10 +30,44 @@ struct ImmersiveView: View {
             // ✨ 改用 Entity+Extensions 提供的優雅語法
             containerBox.addBoxEdges(size: boxSize)
             
-            containerBox.scale = SIMD3<Float>(repeating: 0.1)
-            containerBox.position = SIMD3<Float>(0, 1.1, -0.7)
+            // ✨ 讀取儲存的縮放比例，若無則使用預設值
+            if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
+                containerBox.scale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
+            } else {
+                containerBox.scale = SIMD3<Float>(repeating: 0.1)
+            }
             
-            containerBox.components.set(CollisionComponent(shapes: [.generateBox(size: [boxSize, boxSize, boxSize])]))
+            // ✨ 讀取儲存的空間位置，若無則使用預設值
+            if let savedPos = UserDefaults.standard.array(forKey: "BoxPosition") as? [Float], savedPos.count == 3 {
+                containerBox.position = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
+            } else {
+                containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
+            }
+            
+            // ✨ 替換原本的單一實心碰撞體，改為 12 根邊框專用的碰撞條
+            let s = boxSize
+            let t: Float = 0.2 // 給予邊框 20 公分的「隱形判定厚度」，讓眼睛隨便看都能輕鬆命中
+            let h = s / 2
+            
+            let edgeShapes: [ShapeResource] = [
+                // 橫向 (X軸) 四根
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, h, h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, h, -h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, -h, h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, -h, -h]),
+                // 直向 (Y軸) 四根
+                .generateBox(size: [t, s, t]).offsetBy(translation: [h, 0, h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [h, 0, -h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [-h, 0, h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [-h, 0, -h]),
+                // 深度 (Z軸) 四根
+                .generateBox(size: [t, t, s]).offsetBy(translation: [h, h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [h, -h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [-h, h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [-h, -h, 0])
+            ]
+            
+            containerBox.components.set(CollisionComponent(shapes: edgeShapes))
             containerBox.components.set(InputTargetComponent())
             
             content.add(containerBox)
@@ -94,6 +128,10 @@ struct ImmersiveView: View {
                 setupParticleVisuals(in: containerBox)
                 simulator.needsVisualRebuild = false
             }
+        }
+        // ✨ 新增：監聽螢光開關，一旦切換就呼叫剛剛寫好的材質更新函式
+        .onChange(of: simulator.glowIntensity) { _, _ in
+            updateParticleMaterials()
         }
         .onDisappear {
             frameSubscription?.cancel()

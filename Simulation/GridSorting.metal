@@ -4,7 +4,8 @@ using namespace metal;
 
 kernel void clearGrid(device Cell* grid [[buffer(0)]],
                       uint id [[thread_position_in_grid]]) {
-    if (id < 4096) {
+    // ✨ 修正：擴大到 32768
+    if (id < 32768) {
         atomic_store_explicit(&grid[id].count, 0, memory_order_relaxed);
         atomic_store_explicit(&grid[id].currentOffset, 0, memory_order_relaxed);
     }
@@ -23,7 +24,8 @@ kernel void prefixSumGrid(device Cell* grid [[buffer(0)]],
                           uint id [[thread_position_in_grid]]) {
     if (id == 0) {
         uint sum = 0;
-        for (uint i = 0; i < 4096; i++) {
+        // ✨ 修正：擴大到 32768
+        for (uint i = 0; i < 32768; i++) {
             grid[i].startIndex = sum;
             sum += atomic_load_explicit(&grid[i].count, memory_order_relaxed);
         }

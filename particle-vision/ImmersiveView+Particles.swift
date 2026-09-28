@@ -4,43 +4,50 @@ import RealityKit
 extension ImmersiveView {
     
     func setupParticleVisuals(in parent: Entity) {
-        guard let coreTemplate = self.coreTemplate else { return }
+        guard let meshResource = simulator.meshResource else { return }
         
-        let count = simulator.particleCount
-        let numTypes = simulator.numTypes
-        let pointer = simulator.particleBuffer.contents().bindMemory(to: Particle.self, capacity: count)
-        let colors: [UIColor] = [.systemRed, .systemGreen, .systemBlue, .systemYellow, .systemPurple, .systemOrange]
+        let massiveParticleEntity = ModelEntity()
+        massiveParticleEntity.components.set(ModelComponent(
+            mesh: meshResource,
+            materials: [] // 先留空，交給下方的函式統一生成
+        ))
         
-        var materials: [UnlitMaterial] = []
-        for i in 0..<numTypes { materials.append(UnlitMaterial(color: colors[i % colors.count])) }
+        parent.addChild(massiveParticleEntity)
+        self.particleEntities = [massiveParticleEntity]
         
-        var newEntities: [Entity] = []
-        newEntities.reserveCapacity(count)
-        let initialScale = SIMD3<Float>(repeating: simulator.particleScale)
-        
-        for i in 0..<count {
-            let particle = pointer[i]
-            let typeIndex = Int(particle.type) % materials.count
-            let clone = coreTemplate.clone(recursive: true)
-            
-            if var modelComp = clone.components[ModelComponent.self] {
-                modelComp.materials = [materials[typeIndex]]
-                clone.components.set(modelComp)
-            }
-            
-            clone.scale = initialScale
-            clone.position = particle.position
-            parent.addChild(clone)
-            newEntities.append(clone)
-        }
-        self.particleEntities = newEntities
+        // 初始套用材質
+        updateParticleMaterials()
     }
     
-    func syncParticlesToVisuals() {
-        let count = simulator.particleCount
-        let pointer = simulator.particleBuffer.contents().bindMemory(to: Particle.self, capacity: count)
-        for i in 0..<count {
-            particleEntities[i].position = pointer[i].position
+    func updateParticleMaterials() {
+            guard let entity = self.particleEntities.first as? ModelEntity else { return }
+            
+            let numTypes = simulator.numTypes
+            let colors: [UIColor] = [.systemRed, .systemGreen, .systemBlue, .systemYellow, .systemPurple, .systemOrange]
+            
+            var materials: [RealityKit.Material] = []
+            
+            for i in 0..<numTypes {
+                let color = colors[i % colors.count]
+                
+                // ✨ 判斷強度大於 0 才開啟螢光材質
+                if simulator.glowIntensity > 0 {
+                    var pbrMat = PhysicallyBasedMaterial()
+                    pbrMat.baseColor = PhysicallyBasedMaterial.BaseColor(tint: color)
+                    pbrMat.metallic = PhysicallyBasedMaterial.Metallic(floatLiteral: 0.8)
+                    pbrMat.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.2)
+                    pbrMat.emissiveColor = PhysicallyBasedMaterial.EmissiveColor(color: color)
+                    
+                    // ✨ 將寫死的數值改為讀取 slider 的強度
+                    pbrMat.emissiveIntensity = simulator.glowIntensity
+                    materials.append(pbrMat)
+                } else {
+                    materials.append(SimpleMaterial(color: color, isMetallic: true))
+                }
+            }
+            
+            entity.model?.materials = materials
         }
-    }
+    
+    func syncParticlesToVisuals() {}
 }
