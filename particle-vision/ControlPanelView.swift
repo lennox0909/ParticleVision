@@ -41,13 +41,36 @@ struct ControlPanelView: View {
                         simulator.friction = Float(newValue)
                     }
             }
-            // ✨ 將原本的 Toggle 替換為這組 Slider
+            
+            // ✨ 結合 Slider 與微調按鈕的發光強度控制
             @Bindable var bindableSimulator = simulator
             VStack(alignment: .leading) {
                 Text("螢光強度: \(String(format: "%.1f", simulator.glowIntensity))")
-                // 設定範圍從 0 到 10
-                Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.5)
-                    .tint(.cyan)
+                    .font(.headline)
+                
+                HStack(spacing: 15) {
+                    // 設定範圍從 0 到 5，大範圍拖曳使用 Slider
+                    Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.5)
+                        .tint(.cyan)
+                    
+                    // 點擊一次減 0.1，最低不小於 0
+                    Button {
+                        simulator.glowIntensity = max(0, simulator.glowIntensity - 0.1)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    
+                    // 點擊一次加 0.1，最高不超過 5
+                    Button {
+                        simulator.glowIntensity = min(5, simulator.glowIntensity + 0.1)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                }
             }
             
             HStack(spacing: 20) {

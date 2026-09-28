@@ -44,7 +44,30 @@ struct ImmersiveView: View {
                 containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
             }
             
-            containerBox.components.set(CollisionComponent(shapes: [.generateBox(size: [boxSize, boxSize, boxSize])]))
+            // ✨ 替換原本的單一實心碰撞體，改為 12 根邊框專用的碰撞條
+            let s = boxSize
+            let t: Float = 0.2 // 給予邊框 20 公分的「隱形判定厚度」，讓眼睛隨便看都能輕鬆命中
+            let h = s / 2
+            
+            let edgeShapes: [ShapeResource] = [
+                // 橫向 (X軸) 四根
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, h, h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, h, -h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, -h, h]),
+                .generateBox(size: [s, t, t]).offsetBy(translation: [0, -h, -h]),
+                // 直向 (Y軸) 四根
+                .generateBox(size: [t, s, t]).offsetBy(translation: [h, 0, h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [h, 0, -h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [-h, 0, h]),
+                .generateBox(size: [t, s, t]).offsetBy(translation: [-h, 0, -h]),
+                // 深度 (Z軸) 四根
+                .generateBox(size: [t, t, s]).offsetBy(translation: [h, h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [h, -h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [-h, h, 0]),
+                .generateBox(size: [t, t, s]).offsetBy(translation: [-h, -h, 0])
+            ]
+            
+            containerBox.components.set(CollisionComponent(shapes: edgeShapes))
             containerBox.components.set(InputTargetComponent())
             
             content.add(containerBox)
