@@ -3,6 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-visionOS-black?logo=apple)
 ![Swift](https://img.shields.io/badge/Swift-5.9+-FA7343?logo=swift)
 ![Metal](https://img.shields.io/badge/Technology-Metal%20%7C%20ARKit%20%7C%20RealityKit-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
 - 為 Apple Vision Pro 打造的「粒子生命 (Particle Life)」模擬器。
 - 透過結合 **`Metal Compute Shader`** 的 GPU 平行運算、**`ARKit`** 骨架手勢追蹤，以及 **`RealityKit`** 的沉浸式渲染，玩家可以直接用雙手在空間中「撈取」並擾動這個由數千顆微小粒子組成的浮游生態系。
