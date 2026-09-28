@@ -30,111 +30,122 @@ extension ParticleSimulator {
     }
     
     func setupBuffers() {
-            var initialParticles = [Particle]()
+        var initialParticles = [Particle]()
+        
+        // ✨ 修正 1：計算每種顏色的粒子數量，依序發放身分證，不使用 random
+        let particlesPerType = particleCount / numTypes
+        
+        for i in 0..<particleCount {
+            // 讓前 1/8 的粒子是 Type 0，接下來是 Type 1... 確保與 Mesh 顏色切塊完美對齊
+            let type = UInt32(i / particlesPerType)
             
-            // ✨ 修正 1：計算每種顏色的粒子數量，依序發放身分證，不使用 random
-            let particlesPerType = particleCount / numTypes
-            
-            for i in 0..<particleCount {
-                // 讓前 1/8 的粒子是 Type 0，接下來是 Type 1... 確保與 Mesh 顏色切塊完美對齊
-                let type = UInt32(i / particlesPerType)
-                
-                let p = Particle(
-                    position: SIMD3<Float>(
-                        Float.random(in: -1...1),
-                        Float.random(in: -1...1),
-                        Float.random(in: -1...1)
-                    ),
-                    velocity: SIMD3<Float>(0, 0, 0),
-                    type: type,
-                    originalIndex: UInt32(i),
-                    pad2: 0,
-                    pad3: 0
-                )
-                initialParticles.append(p)
-            }
-            
-            let bufferSize = MemoryLayout<Particle>.stride * particleCount
-            particleBuffer = device.makeBuffer(bytes: initialParticles, length: bufferSize, options: .storageModeShared)
-            sortedParticleBuffer = device.makeBuffer(length: bufferSize, options: .storageModePrivate)
-            
-            let matrixSize = numTypes * numTypes
-            self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
-            
-            paramsBuffer = device.makeBuffer(length: MemoryLayout<SimParams>.stride, options: .storageModeShared)
-            updateParamsBuffer()
-            
-            // 原本: let gridBufferSize = 4096 * 16
-            // ✨ 修改為:
-            let gridBufferSize = 32768 * 16
-            gridBuffer = device.makeBuffer(length: gridBufferSize, options: .storageModePrivate)
-            
-            setupMesh()
+            let p = Particle(
+                position: SIMD3<Float>(
+                    Float.random(in: -1...1),
+                    Float.random(in: -1...1),
+                    Float.random(in: -1...1)
+                ),
+                velocity: SIMD3<Float>(0, 0, 0),
+                type: type,
+                originalIndex: UInt32(i),
+                pad2: 0,
+                pad3: 0
+            )
+            initialParticles.append(p)
         }
         
-        func setupMesh() {
-            var descriptor = LowLevelMesh.Descriptor()
-            descriptor.vertexCapacity = particleCount * 12
-            descriptor.indexCapacity = particleCount * 60
-            descriptor.indexType = .uint32
+        let bufferSize = MemoryLayout<Particle>.stride * particleCount
+        particleBuffer = device.makeBuffer(bytes: initialParticles, length: bufferSize, options: .storageModeShared)
+        sortedParticleBuffer = device.makeBuffer(length: bufferSize, options: .storageModePrivate)
+        
+        let matrixSize = numTypes * numTypes
+        self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
+        
+        paramsBuffer = device.makeBuffer(length: MemoryLayout<SimParams>.stride, options: .storageModeShared)
+        updateParamsBuffer()
+        
+        // 擴大為 32768 格
+        let gridBufferSize = 32768 * 16
+        gridBuffer = device.makeBuffer(length: gridBufferSize, options: .storageModePrivate)
+        
+        setupMesh()
+    }
+        
+    func setupMesh() {
+        var descriptor = LowLevelMesh.Descriptor()
+        
+        // ✨ 修改：頂點與索引的容量降級為四面體 (4 頂點, 12 索引)
+        descriptor.vertexCapacity = particleCount * 4
+        descriptor.indexCapacity = particleCount * 12
+        descriptor.indexType = .uint32
+        
+        // 加入 Normal 屬性，並設定記憶體偏移量 (16 Bytes)
+        descriptor.vertexAttributes = [
+            LowLevelMesh.Attribute(semantic: .position, format: .float3, offset: 0),
+            LowLevelMesh.Attribute(semantic: .normal, format: .float3, offset: 16)
+        ]
+        // 每個頂點的資料總長度變為 32 Bytes (Position 16 + Normal 16)
+        descriptor.vertexLayouts = [
+            LowLevelMesh.Layout(bufferIndex: 0, bufferStride: 32)
+        ]
+        
+        do {
+            let mesh = try LowLevelMesh(descriptor: descriptor)
+            let particlesPerType = particleCount / numTypes
             
-            // ✨ 修改：加入 Normal 屬性，並設定記憶體偏移量 (16 Bytes)
-            descriptor.vertexAttributes = [
-                        LowLevelMesh.Attribute(semantic: .position, format: .float3, offset: 0),
-                        LowLevelMesh.Attribute(semantic: .normal, format: .float3, offset: 16)
-            ]
-                    // ✨ 修改：每個頂點的資料總長度變為 32 Bytes (Position 16 + Normal 16)
-            descriptor.vertexLayouts = [
-                        LowLevelMesh.Layout(bufferIndex: 0, bufferStride: 32)
-            ]
+            // ✨ 修改：每種顏色的索引數量變更為 12 (4 個面 x 3 個點)
+            let indicesPerType = particlesPerType * 12
             
-            do {
-                let mesh = try LowLevelMesh(descriptor: descriptor)
-                let particlesPerType = particleCount / numTypes
-                let indicesPerType = particlesPerType * 60
-                
-                let safeBounds = BoundingBox(
-                    min: SIMD3<Float>(-2.5, -2.5, -2.5),
-                    max: SIMD3<Float>(2.5, 2.5, 2.5)
+            let safeBounds = BoundingBox(
+                min: SIMD3<Float>(-2.5, -2.5, -2.5),
+                max: SIMD3<Float>(2.5, 2.5, 2.5)
+            )
+            
+            mesh.parts.replaceAll((0..<numTypes).map { typeIndex in
+                LowLevelMesh.Part(
+                    // 乘上 4 (Bytes) 確保每種顏色的索引範圍不重疊
+                    indexOffset: typeIndex * indicesPerType * MemoryLayout<UInt32>.stride,
+                    indexCount: indicesPerType,
+                    topology: .triangle,
+                    materialIndex: typeIndex,
+                    bounds: safeBounds
                 )
-                
-                mesh.parts.replaceAll((0..<numTypes).map { typeIndex in
-                    LowLevelMesh.Part(
-                        // ✨ 修正 2：加回 * MemoryLayout<UInt32>.stride！
-                        // RealityKit 這裡要求的是 Bytes，乘上 4 才能讓每種顏色的索引範圍不再重疊 (解決 Z-Fighting)
-                        indexOffset: typeIndex * indicesPerType * MemoryLayout<UInt32>.stride,
-                        indexCount: indicesPerType,
-                        topology: .triangle,
-                        materialIndex: typeIndex,
-                        bounds: safeBounds
-                    )
-                })
-                
-                self.lowLevelMesh = mesh
-                
-                let icosahedronIndices: [UInt32] = [
-                    0,11,5, 0,5,1, 0,1,7, 0,7,10, 0,10,11,
-                    1,5,9, 5,11,4, 11,10,2, 10,7,6, 7,1,8,
-                    3,9,4, 3,4,2, 3,2,6, 3,6,8, 3,8,9,
-                    4,9,5, 2,4,11, 6,2,10, 8,6,7, 9,8,1
-                ]
-                
-                mesh.withUnsafeMutableIndices { rawIndices in
-                    let typedIndices = rawIndices.bindMemory(to: UInt32.self)
-                    for i in 0..<particleCount {
-                        let vOffset = UInt32(i * 12)
-                        let iOffset = i * 60
-                        for j in 0..<60 {
-                            typedIndices[iOffset + j] = vOffset + icosahedronIndices[j]
-                        }
-                    }
+            })
+            
+            self.lowLevelMesh = mesh
+            
+            mesh.withUnsafeMutableIndices { rawIndices in
+                let typedIndices = rawIndices.bindMemory(to: UInt32.self)
+                for i in 0..<particleCount {
+                    // ✨ 修改：每個粒子只需偏移 4 個頂點與 12 個索引
+                    let vOffset = UInt32(i * 4)
+                    let iOffset = i * 12
+                    
+                    // ✨ 建立四面體的 4 個面
+                    // 第 1 面
+                    typedIndices[iOffset + 0] = vOffset + 0
+                    typedIndices[iOffset + 1] = vOffset + 1
+                    typedIndices[iOffset + 2] = vOffset + 2
+                    // 第 2 面
+                    typedIndices[iOffset + 3] = vOffset + 0
+                    typedIndices[iOffset + 4] = vOffset + 3
+                    typedIndices[iOffset + 5] = vOffset + 1
+                    // 第 3 面
+                    typedIndices[iOffset + 6] = vOffset + 0
+                    typedIndices[iOffset + 7] = vOffset + 2
+                    typedIndices[iOffset + 8] = vOffset + 3
+                    // 第 4 面
+                    typedIndices[iOffset + 9] = vOffset + 1
+                    typedIndices[iOffset + 10] = vOffset + 3
+                    typedIndices[iOffset + 11] = vOffset + 2
                 }
-                self.meshResource = try MeshResource(from: mesh)
-                
-            } catch {
-                print("建立 LowLevelMesh 失敗：\(error)")
             }
+            self.meshResource = try MeshResource(from: mesh)
+            
+        } catch {
+            print("建立 LowLevelMesh 失敗：\(error)")
         }
+    }
     
     func updateRuleMatrixBuffer() {
         let size = MemoryLayout<Float>.stride * ruleMatrix.count
@@ -195,7 +206,7 @@ extension ParticleSimulator {
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
         
-        // ✨ 新增：更新 GPU 頂點網格
+        // 更新 GPU 頂點網格
         let currentVertexBuffer = mesh.replace(bufferIndex: 0, using: commandBuffer)
         w = updateMeshPipeline.maxTotalThreadsPerThreadgroup
         computeEncoder.setComputePipelineState(updateMeshPipeline)

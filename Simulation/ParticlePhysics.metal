@@ -101,9 +101,6 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     // 【核心修正】寫回原始身分證的記憶體位址，而非排序後的位址
     particlesOut[p.originalIndex] = p;
 }
-// 👆 上面這個大括號非常重要，代表 computeGridParticles 函式結束。
-
-// 👇 下方的常數與新的 kernel 必須完全獨立在外面！
 
 // 新增：包含位置與法線的頂點結構
 struct ParticleVertex {
@@ -111,13 +108,12 @@ struct ParticleVertex {
     float3 normal;
 };
 
-// 定義二十面體 (Icosahedron) 的 12 個標準頂點
-constant float a = 0.525731f;
-constant float b = 0.850651f;
-constant float3 sphereVerts[12] = {
-    float3(-a,  b,  0), float3( a,  b,  0), float3(-a, -b,  0), float3( a, -b,  0),
-    float3( 0, -a,  b), float3( 0,  a,  b), float3( 0, -a, -b), float3( 0,  a, -b),
-    float3( b,  0, -a), float3( b,  0,  a), float3(-b,  0, -a), float3(-b,  0,  a)
+// ✨ 修改：新增四面體的 4 個頂點 (已正規化處理，長度皆為 1，剛好可作為法線)
+constant float3 tetraVerts[4] = {
+    float3( 1.0,  1.0,  1.0) * 0.57735f,
+    float3( 1.0, -1.0, -1.0) * 0.57735f,
+    float3(-1.0,  1.0, -1.0) * 0.57735f,
+    float3(-1.0, -1.0,  1.0) * 0.57735f
 };
 
 // 替換原有的 kernel，改為輸出 ParticleVertex
@@ -128,12 +124,14 @@ kernel void updateMeshVertices(device const Particle* particles [[buffer(0)]],
     if (id >= params.particleCount) return;
     
     Particle p = particles[id];
-    uint vIndex = p.originalIndex * 12;
+    
+    // ✨ 修改：每個粒子只佔用 4 個頂點的陣列空間
+    uint vIndex = p.originalIndex * 4;
     float size = 0.015;
 
-    for(int i=0; i<12; i++) {
-        vertices[vIndex + i].position = p.position + sphereVerts[i] * size;
-        // 由於我們是以圓球為基底，頂點的標準化相對座標，剛好就是指向外側的法線向量！
-        vertices[vIndex + i].normal = sphereVerts[i];
+    // ✨ 修改：迴圈降至 4 次
+    for(int i=0; i<4; i++) {
+        vertices[vIndex + i].position = p.position + tetraVerts[i] * size;
+        vertices[vIndex + i].normal = tetraVerts[i];
     }
 }
