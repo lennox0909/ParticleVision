@@ -22,3 +22,18 @@ DerivedData/
 
 # Swift Package Manager
 .swiftpm/xcode/
+
+# =========================
+# VS Code
+# =========================
+.vscode/*
+*.code-workspace
+
+# 允許保留給團隊共用的設定 (若你的專案不需要共用，可將下方四行刪除或加上 # 註解)
+# !.vscode/settings.json
+# !.vscode/tasks.json
+# !.vscode/launch.json
+# !.vscode/extensions.json
+
+# VS Code 本機修改歷史紀錄外掛 (Local History)
+.history/
