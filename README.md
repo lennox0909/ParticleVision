@@ -432,7 +432,7 @@ ${LocalIndices} = [\text{ 0, 1, 2,;  0, 2, 3,;  0, 3, 1,;  1, 3, 2 }]$
 
 在 `LowLevelMesh` 的索引緩衝區 (Index Buffer) 中，全域共存放了 (100,000 times 12 = 1,200,000) 個整數索引。
 
-對於第 (i) 顆粒子（(i in )）：
+對於第 $i$ 顆粒子$(i \in )$：
 1. 其 4 個頂點在頂點緩衝區 (Vertex Buffer) 中的**起始編號**為：
    ${baseVertex} = {i \times 4}$
 2. 其 12 個全域索引在 Index Buffer 中的寫入公式如下：
@@ -482,14 +482,14 @@ for i in 0..<particleCount {
 
 * **`packed_float3 position` (12 Bytes / Offset 0)**：
   * 由 3 個 32-bit（4 Bytes）浮點數 `(x, y, z)` 組成。
-  * 計算：$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$。
+  * 計算：$$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$$。
 * **`packed_float3 normal` (12 Bytes / Offset 12)**：
   * 由 3 個 32-bit（4 Bytes）浮點數 `(nx, ny, nz)` 組成。
-  * 計算：$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$。
+  * 計算：$$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$$。
   * 位移（Offset）：在 `position` 之後，位移量為 $0 + 12 = 12 \text{ Bytes}$。
 * **`float4 color` (16 Bytes / Offset 24)**：
   * 由 4 個 32-bit（4 Bytes）浮點數 `(r, g, b, a)` 組成。
-  * 計算：$4 \times 4 \text{ Bytes} = 16 \text{ Bytes}$。
+  * 計算：$$4 \times 4 \text{ Bytes} = 16 \text{ Bytes}$$。
   * 位移（Offset）：在 `normal` 之後，位移量為 $12 + 12 = 24 \text{ Bytes}$。
 
 
