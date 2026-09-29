@@ -13,7 +13,9 @@
 
 <div align="center">
 
-**[Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#gridsorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
+### Quick Start
+
+**[Technical Details](#️-技術細節-technical-details) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#gridsorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
 
 </div>
 
@@ -40,7 +42,7 @@
 
 ---
 
-## 🛠️ 技術細節 (Technical Details)
+## [🛠️ 技術細節 (Technical Details)](#quick-start)
 
 本專案解決了 visionOS 開發中多個高難度的效能與渲染痛點：
 1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的頂點與法線緩衝區 (Vertex Buffer)，實現十萬顆粒子 90 FPS 零掉幀的驚人表現。
@@ -65,7 +67,7 @@
 4. **互動與碰撞**：單手捏合 (Pinch) 邊界盒子的任一處並拖曳，像拿著網子一樣在空間中撈取粒子，體驗真實的推擠與反彈動能。
 
 ---
-## 📂 專案結構 (Project Structure)
+## [📂 專案結構 (Project Structure)](#quick-start)
 
 本專案採用清晰的架構，將 UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
 
@@ -116,7 +118,7 @@
 ```
 
 ---
-## ⚙️ 運作原理 (Under the Hood)
+## [⚙️ 運作原理 (Under the Hood)](#quick-start)
 
 - 在 Apple Vision Pro 的主畫面（Home View）點擊這個 App 的 3D 圖示（`AppIcon.solidimagestack`）時，visionOS 系統會啟動一連串精密的軟硬體協作程序。以下是依照時間序展開的檔案載入、相依性建立與硬體資源調用流程：
 
@@ -315,7 +317,7 @@ flowchart TD
     A3 --> E_Run
 ```
 ---
-## GridSorting and （前綴和 Prefix Sum / 排序 Counting Sort）
+## [GridSorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
 
 - 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 (O(N^2)) 降低至 (O(N)) 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
 
@@ -343,7 +345,7 @@ flowchart TD
 
 ---
 
-## Memory Alignment
+## [Memory Alignment](#quick-start)
 
 - 在 **Particle Life visionOS** 中，記憶體對齊（Memory Alignment）是讓 C (Bridging Header)、Swift (RealityKit/LowLevelMesh) 與 Metal (Compute Shader) 三端能**共享同一塊二進位記憶體緩衝區 (`MTLBuffer`)** 的關鍵技術。若對齊不一致，GPU 寫入的位元組會被 Swift/RealityKit 錯位解析，導致畫面破圖甚至崩潰。
 
@@ -394,7 +396,7 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 💡 想進一步探討 `ParticleSimulator+Metal.swift` 如何在 Swift 端配置 `MTLBuffer` 並指派給 `LowLevelMesh`，或是想查看 `SimParams` 結構在 16-byte alignment 下的細節嗎？
 
 ---
-## Local Indices
+## [Local Indices](#quick-start)
 
 - 每顆粒子被幾何降級為包含 **4 個頂點** 與 **12 個三角形索引 (Indices)** 的正四面體。這 12 個索引的計算原理分為 **局部幾何面定義** 與 **全域記憶體位移算式**：
 
@@ -457,7 +459,7 @@ for i in 0..<particleCount {
 * **零 CPU 負擔 (Zero CPU Overhead)**：由於拓樸結構固定，執行期索引緩衝區完全維持靜態。每一幀只需由 Metal Compute Shader 動態更新 Vertex Buffer 中的頂點座標，即可達成 90 FPS 零掉幀渲染。
 
 ---
-## 40-Byte Stride
+## [40-Byte Stride](#quick-start)
 
 - 共享結構定義 **`ParticleTypes.h`** 中，`LowLevelMesh` 的頂點結構 **`VertexData`** 總步距（Stride）為 **40 Bytes**，其計算是由各欄位的型別大小與 Offset 累加而得：
 
