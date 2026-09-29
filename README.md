@@ -42,7 +42,7 @@
 
 ---
 
-## [🛠️ 技術細節 (Technical Details)](#quick-start)
+## 🛠️ [技術細節 (Technical Details)](#quick-start)
 
 本專案解決了 visionOS 開發中多個高難度的效能與渲染痛點：
 1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的頂點與法線緩衝區 (Vertex Buffer)，實現十萬顆粒子 90 FPS 零掉幀的驚人表現。
@@ -67,7 +67,7 @@
 4. **互動與碰撞**：單手捏合 (Pinch) 邊界盒子的任一處並拖曳，像拿著網子一樣在空間中撈取粒子，體驗真實的推擠與反彈動能。
 
 ---
-## [📂 專案結構 (Project Structure)](#quick-start)
+## 📂 [專案結構 (Project Structure)](#quick-start)
 
 本專案採用清晰的架構，將 UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
 
@@ -118,7 +118,7 @@
 ```
 
 ---
-## [⚙️ 運作原理 (Under the Hood)](#quick-start)
+## ⚙️ [運作原理 (Under the Hood)](#quick-start)
 
 - 在 Apple Vision Pro 的主畫面（Home View）點擊這個 App 的 3D 圖示（`AppIcon.solidimagestack`）時，visionOS 系統會啟動一連串精密的軟硬體協作程序。以下是依照時間序展開的檔案載入、相依性建立與硬體資源調用流程：
 
