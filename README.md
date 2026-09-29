@@ -15,7 +15,7 @@
 
 ### Quick Start
 
-**[Technical Details](#️-技術細節-technical-details) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#gridsorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
+**[Technical Summary](#️-技術摘要-technical-summary) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#grid-sorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
 
 </div>
 
@@ -25,29 +25,29 @@
 ## ✨ 核心特色 (Key Features)
 
 ### 🚀 突破極限的 GPU 物理運算 (Metal Compute Shader)
-- **十萬級粒子渲染 (`LowLevelMesh`)**：捨棄傳統的獨立實體 (Entity)，改用純 GPU 驅動的自訂網格。透過「四面體幾何降級 (4 頂點/12 索引)」，成功在 visionOS 上流暢渲染 **100,000 顆** PBR 發光粒子。
-- **空間雜湊 (Spatial Hashing)**：將 $O(N^2)$ 的碰撞複雜度降至 $O(N)$，並將空間網格最佳化至 $32^3$ (32,768 格)，完美平衡 Prefix Sum 負載與記憶體快取命中率。
-- **GPU 空間排序 (Spatial Sorting)**：實作計數排序與前綴和，確保物理空間相近的粒子在 GPU 記憶體中絕對連續，榨出極致的硬體效能。
+- **十萬級粒子渲染 (`LowLevelMesh`)**：捨棄傳統的獨立實體 (Entity)，改用純 GPU 驅動的自訂網格。透過「四面體幾何降級 (4 頂點/12 索引)」，在 visionOS 上流暢渲染 **100,000 顆** PBR 發光粒子。
+- **空間雜湊 (Spatial Hashing)**：將 $O(N^2)$ 的碰撞複雜度降至 $O(N)$，並將空間網格最佳化至 $32^3$ (32,768 格)美平衡 Prefix Sum 負載與記憶體快取命中率。
+- **GPU 空間排序 (Spatial Sorting)**：實作計數排序與前綴和，確保物理空間相近的粒子在 GPU 記憶體中絕對連續，榨出硬體效能。
 
 ### 🖐️ 沉浸式實體反饋 (Scoop Net Physics)
 - **撈魚網物理學**：當使用者移動透明盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
-- **精確骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現穩定且無死角的單手 6-DOF 空間拖曳與雙手縮放。
+- **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
 
 ### 🎛️ 即時動態控制面板 (SwiftUI)
-提供無邊緣裁切、完美適配玻璃背景的空間浮動視窗，支援即時監測與調整：
-- **即時 FPS 監控**：內建每秒幀率顯示器，精準掌握硬體負載與視覺流暢度。
+無邊緣裁切、適配玻璃背景的空間浮動視窗，支援即時監測與調整：
+- **即時 FPS 監控**：每秒幀率顯示器，掌握硬體負載與視覺流暢度。
 - **粒子數量與種類**：動態增減 (1,000 ~ 100,000 顆)，支援高達 8 種屬性的粒子互相吸引/排斥。
 - **螢光強度 (Glow Intensity)**：即時調整 PBR 材質的發光強度，呈現絢麗的自發光星系視覺效果。
 - **空間摩擦力 (Friction)**：即時調整宇宙的「黏滯感」(0.01 泥漿阻力 ~ 0.99 太空滑行)。
 
 ---
 
-## 🛠️ [技術細節 (Technical Details)](#quick-start)
+## 🛠️ [技術摘要 (Technical Summary)](#quick-start)
 
-本專案解決了 visionOS 開發中多個高難度的效能與渲染痛點：
-1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的頂點與法線緩衝區 (Vertex Buffer)，實現十萬顆粒子 90 FPS 零掉幀的驚人表現。
-2. **解決射線偵測 (Raycast) 盲區**：將單一實心碰撞體重構為 12 道精準的邊緣碰撞條 (Edge Shapes)，不僅消除 UI 遮蔽死角，更大幅提升手勢命中的穩定度。
-3. **視窗排版完美適配**：捨棄雙重 `padding` 與寫死的背景，改用適當的最小長寬限制搭配安全邊距，根除系統預設圓角造成的 UI 跑版與邊緣裁切問題。
+解決 visionOS 多個高難度的效能與渲染痛點：
+1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的`頂點` (`Vertex`) 與`法線`(`Normal Vector`)緩衝區 (`Vertex Buffer`)，實現十萬顆粒子 90 FPS 表現。
+2. **解決射線偵測 (Raycast) 盲區**：將單一實心碰撞體重構為 12 道精準的邊緣碰撞條 (Edge Shapes)，消除 UI 遮蔽死角，提升手勢命中的穩定度。
+3. **視窗排版**：用適當的最小長寬限制搭配安全邊距，根除系統預設圓角造成的 UI 跑版與邊緣裁切問題。
 
 ---
 
@@ -69,7 +69,7 @@
 ---
 ## 📂 [專案結構 (Project Structure)](#quick-start)
 
-本專案採用清晰的架構，將 UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
+- UI 介面、渲染層與底層 GPU 物理引擎完全解耦：
 
 ```text
 .
@@ -123,7 +123,10 @@
 - 在 Apple Vision Pro 的主畫面（Home View）點擊這個 App 的 3D 圖示（`AppIcon.solidimagestack`）時，visionOS 系統會啟動一連串精密的軟硬體協作程序。以下是依照時間序展開的檔案載入、相依性建立與硬體資源調用流程：
 
 ### 1. App 進入點與生命週期註冊
-visionOS 讀取 `Info.plist` 確認系統權限與環境配置後，進入 `@main` 標記的 `ParticleVisionApp.swift`。系統會在此向作業系統註冊兩個核心場景容器：一個是用於顯示 2D UI 的 `WindowGroup`（負責載入 `ContentView`），另一個是預備用來渲染 3D 空間的 `ImmersiveSpace`（綁定 `ImmersiveView`），並同步初始化全域的環境狀態。
+- visionOS 讀取 `Info.plist` 確認系統權限與環境配置後，進入 `@main` 標記的 `ParticleVisionApp.swift`。
+- 系統會在此向作業系統註冊兩個核心場景容器：
+    - 一個是用於顯示 2D UI 的 `WindowGroup`（負責載入 `ContentView`）
+    - 另一個是預備用來渲染 3D 空間的 `ImmersiveSpace`（綁定 `ImmersiveView`），並同步初始化全域的環境狀態。
 
 ```mermaid
 ---
@@ -156,7 +159,8 @@ flowchart TD
 ```
 
 ### 2. 2D 視窗渲染與 UI 實例化
-系統接著繪製 `ContentView.swift`，並根據程式碼中設定的 `frame(width: 750, height: 850)` 向 visionOS 請求一塊精確大小的 2D 視窗，並套用系統原生的玻璃背景效果（Glass Background）。此時 `ControlPanelView.swift` 內的各項滑桿與按鈕也一併實例化，進入等待使用者互動的就緒狀態。
+- 系統接著繪製 `ContentView.swift`，並根據程式碼中設定的 `frame(width: 750, height: 850)` 向 visionOS 請求一塊精確大小的 2D 視窗，並套用系統原生的玻璃背景效果（Glass Background）。
+- 此時 `ControlPanelView.swift` 內的各項滑桿與按鈕也一併實例化，進入等待使用者互動的就緒狀態。
 
 ```mermaid
 ---
@@ -192,7 +196,8 @@ flowchart TD
 ```
 
 ### 3. Metal GPU 引擎與記憶體預熱
-當負責核心運算的 `ParticleSimulator` 被實例化時，會立即觸發底層的 `setupMetal()` 與 `setupBuffers()`。此階段 CPU 會向 Apple Silicon 晶片請求建立 Command Queue，編譯 `ParticlePhysics.metal` 與 `GridSorting.metal` 成可執行的 Compute Pipeline，並在實體記憶體中配置容納 10 萬顆粒子與 32³ 空間網格所需的 `MTLBuffer`，最後建立 `LowLevelMesh` 準備承接巨量的頂點資料。
+- 當負責核心運算的 `ParticleSimulator` 被實例化時，會立即觸發底層的 `setupMetal()` 與 `setupBuffers()`。
+- 此階段 CPU 會向 Apple Silicon 晶片請求建立 Command Queue，編譯 `ParticlePhysics.metal` 與 `GridSorting.metal` 成可執行的 Compute Pipeline，並在實體記憶體中配置容納 10 萬顆粒子與 $32^3$ 空間網格所需的 `MTLBuffer`，最後建立 `LowLevelMesh` 準備承接巨量的頂點資料。
 
 ```mermaid
 ---
@@ -226,7 +231,8 @@ flowchart TD
 ```
 
 ### 4. 沉浸式空間轉換 (Immersive Transition)
-當使用者點擊「啟動十萬粒子宇宙」時，按鈕觸發 `openImmersiveSpace` API。visionOS 接到指令後，會平滑地將應用程式狀態切換至沉浸模式（Mixed Reality），解鎖立體空間的渲染權限，並開始執行 `ImmersiveView.swift` 的載入邏輯。
+- 當使用者點擊「啟動十萬粒子宇宙」時，按鈕觸發 `openImmersiveSpace` API。
+- visionOS 接到指令後，會平滑地將應用程式狀態切換至沉浸模式（Mixed Reality），解鎖立體空間的渲染權限，並開始執行 `ImmersiveView.swift` 的載入邏輯。
 
 ```mermaid
 ---
@@ -254,7 +260,8 @@ flowchart TD
 ```
 
 ### 5. RealityKit 場景建構與 ARKit 啟動
-在 `ImmersiveView` 中，RealityKit 會先生成核心的透明實體 `containerBox`，並利用 `Entity+Extensions.swift` 附加 12 道隱形的碰撞邊界組件（CollisionComponent）。同時，非同步任務（Task）會向系統請求手部骨架追蹤權限，啟動 `ARKitSession` 與 `HandTrackingProvider`，開始捕捉雙手的 6-DOF 空間座標。
+- 在 `ImmersiveView` 中，RealityKit 會先生成核心的透明實體 `containerBox`，並利用 `Entity+Extensions.swift` 附加 12 道隱形的碰撞邊界組件（CollisionComponent）。
+- 同時，非同步任務（Task）會向系統請求手部骨架追蹤權限，啟動 `ARKitSession` 與 `HandTrackingProvider`，開始捕捉雙手的 6-DOF 空間座標。
 
 ```mermaid
 ---
@@ -286,7 +293,13 @@ flowchart TD
 ```
 
 ### 6. 渲染迴圈 (Render Loop) 與 GPU 交接
-一切就緒後，視圖會訂閱 `SceneEvents.Update.self`，將每秒最高 90 次的畫面更新權正式交棒給模擬器。在每一個 Frame 中，系統會嚴格依序執行：透過客製化手勢更新盒子座標 $\rightarrow$ 派發 GPU 運算指令 (`updateSimulation`) 進行空間雜湊與碰撞計算 $\rightarrow$ 將算好的頂點與法線資料同步回 RealityKit 的 `LowLevelMesh`。至此，整個粒子宇宙開始無縫運轉。
+- 一切就緒後，視圖會訂閱 `SceneEvents.Update.self`，將每秒最高 90 次的畫面更新權正式交棒給模擬器。
+- 在每一個 Frame 中，系統會嚴格依序執行：
+    - 透過客製化手勢更新盒子座標 $\rightarrow$
+    - 派發 GPU 運算指令 (`updateSimulation`) 進行空間雜湊與碰撞計算 $\rightarrow$
+    - 將算好的頂點與法線資料同步回 RealityKit 的 `LowLevelMesh`。
+
+- 至此，整個粒子宇宙開始無縫運轉。
 
 ```mermaid
 ---
@@ -317,20 +330,20 @@ flowchart TD
     A3 --> E_Run
 ```
 ---
-## [GridSorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
+## [Grid Sorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
 
-- 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 (O(N^2)) 降低至 (O(N)) 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
+- 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 $(O(N^2))$ 降低至 $(O(N))$ 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
 
 具體的實作機制與流程可分為以下三個核心階段：
 
 ### 1. 空間雜湊與細胞計數 (Spatial Hashing & Counting)
-* **劃分 (32^3) 空間網格**：系統將 3D 空間劃分為 (32 times 32 times 32)（共 32,768 個格子）的幾何網格。
+* **劃分 $32^3$ 空間網格**：系統將 3D 空間劃分為 (32 times 32 times 32)（共 32,768 個格子）的幾何網格。
 * **計算 Grid Index**：在第一個 Compute Kernel 中，GPU 會同步讀取 10 萬顆粒子的 3D 座標，並透過雜湊函式計算出每顆粒子落在第幾個格子（Grid Index）。
 * **原子加總 (Atomic Addition)**：使用 Metal 的原子操作計數器，累加每個格子內的粒子總數（Cell Count），為計數排序建立直方圖。
 
 
 ### 2. GPU 前綴和計算 (Prefix Sum / Inclusive & Exclusive Scan)
-前綴和演算法的核心作用，是將**「各格子的粒子數量」轉換為「該格子粒子在重排緩衝區中的起始記憶體位移 (Offset)」**：
+前綴和演算法的核心作用，是將 **「各格子的粒子數量」轉換為「該格子粒子在重排緩衝區中的起始記憶體位移 (Offset)」**：
 * **前綴和位移計算**：對 32,768 個格子的數量陣列執行掃描計算。例如：若第 0 格有 5 顆粒子、第 1 格有 3 顆粒子，經 Exclusive Prefix Sum 計算後，第 0 格的起始偏移位址為 `0`，第 1 格為 `5`，第 2 格則為 `8`（`5 + 3`）。
 * **定義記憶體邊界**：前綴和運算結果會直接記錄每個 `Cell` 的 `startIndex` 與 `endIndex`，明確劃分出每個網格在全局陣列中的存放區間。
 
@@ -347,7 +360,7 @@ flowchart TD
 
 ## [Memory Alignment](#quick-start)
 
-- 在 **Particle Life visionOS** 中，記憶體對齊（Memory Alignment）是讓 C (Bridging Header)、Swift (RealityKit/LowLevelMesh) 與 Metal (Compute Shader) 三端能**共享同一塊二進位記憶體緩衝區 (`MTLBuffer`)** 的關鍵技術。若對齊不一致，GPU 寫入的位元組會被 Swift/RealityKit 錯位解析，導致畫面破圖甚至崩潰。
+- 在 **Particle Life visionOS** 中，記憶體對齊（Memory Alignment）是讓 C (`Bridging Header`)`、Swift` (`RealityKit`/`LowLevelMesh`) 與 `Metal` (`Compute Shader`) 三端能**共享同一塊二進位記憶體緩衝區 (`MTLBuffer`)** 的關鍵技術。若對齊不一致，GPU 寫入的位元組會被 `Swift`/`RealityKit` 錯位解析，導致畫面破圖甚至崩潰。
 
 以下是專案中記憶體對齊的核心細節與實作規則：
 
@@ -374,7 +387,7 @@ Metal Shader 與 C/Swift 對於向量型別的預設對齊方式不同：
 
 
 ### 3. Swift 端的 `LowLevelMesh` Layout 映射
-為了讓 RealityKit 讀懂 Metal Shader 直接寫入 `MTLBuffer` 的頂點，Swift 端建立 `LowLevelMesh` 時必須嚴格設定 `VertexLayout` 的位移 (Offset) 與步距 (Stride)：
+為了讓 `RealityKit` 讀懂 `Metal Shader` 直接寫入 `MTLBuffer` 的頂點，`Swift` 端建立 `LowLevelMesh` 時必須嚴格設定 `VertexLayout` 的`位移` (`Offset`) 與`步距` (`Stride`)：
 
 ```swift
 // Swift 中的 LowLevelMesh 宣告範例
@@ -393,8 +406,6 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 1. **零記憶體拷貝 (Zero Copy)**：Metal Compute Shader 將四面體 4 個頂點的 3D 座標、法線與顏色算好後，直接覆寫映射好的 `MTLBuffer`。
 2. **無縫 GPU-to-Render**：RealityKit 依據上述 40-byte 步距的 `VertexLayout` 直接讀取相同的 `MTLBuffer`，實現全 GPU 驅動的零 CPU 開銷渲染 (Zero CPU Overhead)。
 
-💡 想進一步探討 `ParticleSimulator+Metal.swift` 如何在 Swift 端配置 `MTLBuffer` 並指派給 `LowLevelMesh`，或是想查看 `SimParams` 結構在 16-byte alignment 下的細節嗎？
-
 ---
 ## [Local Indices](#quick-start)
 
@@ -411,7 +422,8 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 * **面 4 (頂面)**：由頂點 `(1, 3, 2)` 組成
 
 每個三角形面由 3 個頂點索引組成，因此單一四面體的 **12 個局部索引順序** 為：
-[text{LocalIndices} = [0, 1, 2,; 0, 2, 3,; 0, 3, 1,; 1, 3, 2]]
+
+${LocalIndices} = [0, 1, 2,; 0, 2, 3,; 0, 3, 1,; 1, 3, 2]$
 
 > **頂點繞序 (Winding Order)**：索引順序嚴格遵循逆時針 (CCW) 順序，確保 GPU 渲染時 4 個面的幾何法線方向皆正確朝向體外。
 
@@ -422,7 +434,7 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 
 對於第 (i) 顆粒子（(i in )）：
 1. 其 4 個頂點在頂點緩衝區 (Vertex Buffer) 中的**起始編號**為：
-   [text{baseVertex} = i times 4]
+   ${baseVertex} = {i \times 4}$
 2. 其 12 個全域索引在 Index Buffer 中的寫入公式如下：
 
 ```swift
@@ -470,15 +482,15 @@ for i in 0..<particleCount {
 
 * **`packed_float3 position` (12 Bytes / Offset 0)**：
   * 由 3 個 32-bit（4 Bytes）浮點數 `(x, y, z)` 組成。
-  * 計算：(3 times 4 text{ Bytes} = mathbf{12 text{ Bytes}})。
+  * 計算：$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$。
 * **`packed_float3 normal` (12 Bytes / Offset 12)**：
   * 由 3 個 32-bit（4 Bytes）浮點數 `(nx, ny, nz)` 組成。
-  * 計算：(3 times 4 text{ Bytes} = mathbf{12 text{ Bytes}})。
-  * 位移（Offset）：在 `position` 之後，位移量為 (0 + 12 = mathbf{12 text{ Bytes}})。
+  * 計算：$3 \times 4 \text{ Bytes} = 12 \text{ Bytes}$。
+  * 位移（Offset）：在 `position` 之後，位移量為 $0 + 12 = 12 \text{ Bytes}$。
 * **`float4 color` (16 Bytes / Offset 24)**：
   * 由 4 個 32-bit（4 Bytes）浮點數 `(r, g, b, a)` 組成。
-  * 計算：(4 times 4 text{ Bytes} = mathbf{16 text{ Bytes}})。
-  * 位移（Offset）：在 `normal` 之後，位移量為 (12 + 12 = mathbf{24 text{ Bytes}})。
+  * 計算：$4 \times 4 \text{ Bytes} = 16 \text{ Bytes}$。
+  * 位移（Offset）：在 `normal` 之後，位移量為 $12 + 12 = 24 \text{ Bytes}$。
 
 
 ### 2. 總步距（Total Stride）加總算式
