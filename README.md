@@ -332,12 +332,12 @@ flowchart TD
 ---
 ## [Grid Sorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
 
-- 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 $(O(N^2))$ 降低至 $(O(N))$ 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
+- 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 $O(N^2)$ 降低至 $O(N)$ 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
 
 具體的實作機制與流程可分為以下三個核心階段：
 
 ### 1. 空間雜湊與細胞計數 (Spatial Hashing & Counting)
-* **劃分 $32^3$ 空間網格**：系統將 3D 空間劃分為 (32 times 32 times 32)（共 32,768 個格子）的幾何網格。
+* **劃分 $32^3$ 空間網格**：系統將 3D 空間劃分為 $32 \times 32 \times 32$（共 32,768 個格子）的幾何網格。
 * **計算 Grid Index**：在第一個 Compute Kernel 中，GPU 會同步讀取 10 萬顆粒子的 3D 座標，並透過雜湊函式計算出每顆粒子落在第幾個格子（Grid Index）。
 * **原子加總 (Atomic Addition)**：使用 Metal 的原子操作計數器，累加每個格子內的粒子總數（Cell Count），為計數排序建立直方圖。
 
@@ -423,7 +423,7 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 
 每個三角形面由 3 個頂點索引組成，因此單一四面體的 **12 個局部索引順序** 為：
 
-${LocalIndices} = [0, 1, 2,; 0, 2, 3,; 0, 3, 1,; 1, 3, 2]$
+${LocalIndices} = [\text{ 0, 1, 2,;  0, 2, 3,;  0, 3, 1,;  1, 3, 2 }]$
 
 > **頂點繞序 (Winding Order)**：索引順序嚴格遵循逆時針 (CCW) 順序，確保 GPU 渲染時 4 個面的幾何法線方向皆正確朝向體外。
 
