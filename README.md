@@ -9,9 +9,17 @@
 - 透過結合 **`Metal Compute Shader`** 的 GPU 平行運算、**`ARKit`** 骨架手勢追蹤，以及 **`RealityKit`** 的沉浸式渲染，玩家可以直接用雙手在空間中「撈取」並擾動這個由數千顆微小粒子組成的浮游生態系。
 
 
+---
 
+<div align="center">
 
+**[Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#gridsorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
 
+</div>
+
+---
+
+---
 ## ✨ 核心特色 (Key Features)
 
 ### 🚀 突破極限的 GPU 物理運算 (Metal Compute Shader)
@@ -306,11 +314,186 @@ flowchart TD
     A3 --> L_Start
     A3 --> E_Run
 ```
+---
+## GridSorting and （前綴和 Prefix Sum / 排序 Counting Sort）
+
+- 在 **`GridSorting.metal`** 中實作前綴和排序（Prefix Sum / Counting Sort），是整個模擬器能將物理計算複雜度從 (O(N^2)) 降低至 (O(N)) 並保持 90 FPS 的靈魂所在。其核心機制是透過 GPU 平行計算，將空間中的粒子依據所處的網格位置重新排列成**連續的記憶體區段**。
+
+具體的實作機制與流程可分為以下三個核心階段：
+
+### 1. 空間雜湊與細胞計數 (Spatial Hashing & Counting)
+* **劃分 (32^3) 空間網格**：系統將 3D 空間劃分為 (32 times 32 times 32)（共 32,768 個格子）的幾何網格。
+* **計算 Grid Index**：在第一個 Compute Kernel 中，GPU 會同步讀取 10 萬顆粒子的 3D 座標，並透過雜湊函式計算出每顆粒子落在第幾個格子（Grid Index）。
+* **原子加總 (Atomic Addition)**：使用 Metal 的原子操作計數器，累加每個格子內的粒子總數（Cell Count），為計數排序建立直方圖。
 
 
+### 2. GPU 前綴和計算 (Prefix Sum / Inclusive & Exclusive Scan)
+前綴和演算法的核心作用，是將**「各格子的粒子數量」轉換為「該格子粒子在重排緩衝區中的起始記憶體位移 (Offset)」**：
+* **前綴和位移計算**：對 32,768 個格子的數量陣列執行掃描計算。例如：若第 0 格有 5 顆粒子、第 1 格有 3 顆粒子，經 Exclusive Prefix Sum 計算後，第 0 格的起始偏移位址為 `0`，第 1 格為 `5`，第 2 格則為 `8`（`5 + 3`）。
+* **定義記憶體邊界**：前綴和運算結果會直接記錄每個 `Cell` 的 `startIndex` 與 `endIndex`，明確劃分出每個網格在全局陣列中的存放區間。
+
+
+### 3. 粒子記憶體重排 (Particle Scatter & Reordering)
+* **寫入連續記憶體 (`Sorted Particle Buffer`)**：根據前綴和算出的起始位移，GPU 再次平行派發指令，將 10 萬顆粒子寫入新的排序緩衝區。
+* **極大化快取命中率 (Cache Hit Rate)**：完成排序後，**在物理空間中相近的粒子，在 GPU 記憶體中也會被絕對連續地排列**。
+
+
+### 🌟 排序完成後的物理計算效益
+當後續的物理引擎 `ParticlePhysics.metal` 執行引力與斥力計算時，每顆粒子不再需要搜尋全域 10 萬顆粒子，而是直接查詢目標格子及其周圍相鄰的 27 個格子。由於這些格子的粒子資料在記憶體中高度連續，GPU Thread Group 讀取時能達到極高的 L1/L2 快取命中率，實現零 CPU 開銷的極致效能。
 
 ---
 
+## Memory Alignment
+
+- 在 **Particle Life visionOS** 中，記憶體對齊（Memory Alignment）是讓 C (Bridging Header)、Swift (RealityKit/LowLevelMesh) 與 Metal (Compute Shader) 三端能**共享同一塊二進位記憶體緩衝區 (`MTLBuffer`)** 的關鍵技術。若對齊不一致，GPU 寫入的位元組會被 Swift/RealityKit 錯位解析，導致畫面破圖甚至崩潰。
+
+以下是專案中記憶體對齊的核心細節與實作規則：
+
+
+### 1. 跨語言共享結構定義 (`ParticleTypes.h`)
+* **Bridging Header 橋接**：透過 `particle-vision-Bridging-Header.h` 將 C 語言標頭檔 `ParticleTypes.h` 引入 Swift 中。
+* **單一真理來源 (Single Source of Truth)**：`ParticleTypes.h` 同時被 Swift (`ParticleSimulator+Metal.swift`) 與 Metal Shader (`ParticlePhysics.metal`) 引入。這確保了兩端在編譯時使用完全相同的 `struct` 欄位順序與型別宣告。
+
+
+### 2. Metal vector 型別的對齊規則 (Alignment Rules)
+Metal Shader 與 C/Swift 對於向量型別的預設對齊方式不同：
+* **`float3` vs `packed_float3`**：
+  * **`float3`**：在 Metal 中預設以 **16-byte** 對齊（與 `float4` 相同，最後 4-byte 為補齊的 padding）。
+  * **`packed_float3`**：精確佔用 **12-byte**（3 個 4-byte float），無強制 16-byte padding。
+* **頂點結構 (`VertexData`) 的緊湊佈局**：
+  在 `LowLevelMesh` 頂點資料中，專案偏好使用 `packed_float3` 來降低頂點緩衝區大小並優化 GPU 記憶體頻寬：
+  ```c
+  typedef struct {
+      packed_float3 position; // 12 bytes (Offset 0)
+      packed_float3 normal;   // 12 bytes (Offset 12)
+      float4        color;    // 16 bytes (Offset 24)
+  } VertexData; // 總 Stride = 40 bytes
+  ```
+
+
+### 3. Swift 端的 `LowLevelMesh` Layout 映射
+為了讓 RealityKit 讀懂 Metal Shader 直接寫入 `MTLBuffer` 的頂點，Swift 端建立 `LowLevelMesh` 時必須嚴格設定 `VertexLayout` 的位移 (Offset) 與步距 (Stride)：
+
+```swift
+// Swift 中的 LowLevelMesh 宣告範例
+var vertexLayout = LowLevelMesh.VertexLayout()
+vertexLayout.attributes = [
+    .init(format: .float3, offset: 0,  attribute: .position), // 對應 packed_float3 position (12 bytes)
+    .init(format: .float3, offset: 12, attribute: .normal),   // 對應 packed_float3 normal (12 bytes)
+    .init(format: .float4, offset: 24, attribute: .color)     // 對應 float4 color (16 bytes)
+]
+vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
+```
+
+---
+
+### 4. 記憶體對齊帶來的極致效能
+1. **零記憶體拷貝 (Zero Copy)**：Metal Compute Shader 將四面體 4 個頂點的 3D 座標、法線與顏色算好後，直接覆寫映射好的 `MTLBuffer`。
+2. **無縫 GPU-to-Render**：RealityKit 依據上述 40-byte 步距的 `VertexLayout` 直接讀取相同的 `MTLBuffer`，實現全 GPU 驅動的零 CPU 開銷渲染 (Zero CPU Overhead)。
+
+💡 想進一步探討 `ParticleSimulator+Metal.swift` 如何在 Swift 端配置 `MTLBuffer` 並指派給 `LowLevelMesh`，或是想查看 `SimParams` 結構在 16-byte alignment 下的細節嗎？
+
+---
+## Local Indices
+
+- 每顆粒子被幾何降級為包含 **4 個頂點** 與 **12 個三角形索引 (Indices)** 的正四面體。這 12 個索引的計算原理分為 **局部幾何面定義** 與 **全域記憶體位移算式**：
+
+
+### 1. 單一四面體的局部索引構建 (Local Face Indices)
+
+一個正四面體共有 4 個頂點（局部編號為 `0, 1, 2, 3`），這 4 個頂點可組合為 **4 個三角形面**：
+
+* **面 1 (底面)**：由頂點 `(0, 1, 2)` 組成
+* **面 2 (側面 1)**：由頂點 `(0, 2, 3)` 組成
+* **面 3 (側面 2)**：由頂點 `(0, 3, 1)` 組成
+* **面 4 (頂面)**：由頂點 `(1, 3, 2)` 組成
+
+每個三角形面由 3 個頂點索引組成，因此單一四面體的 **12 個局部索引順序** 為：
+[text{LocalIndices} = [0, 1, 2,; 0, 2, 3,; 0, 3, 1,; 1, 3, 2]]
+
+> **頂點繞序 (Winding Order)**：索引順序嚴格遵循逆時針 (CCW) 順序，確保 GPU 渲染時 4 個面的幾何法線方向皆正確朝向體外。
+
+
+### 2. 全局 10 萬顆粒子的索引位移公式 (Global Index Offset)
+
+在 `LowLevelMesh` 的索引緩衝區 (Index Buffer) 中，全域共存放了 (100,000 times 12 = 1,200,000) 個整數索引。
+
+對於第 (i) 顆粒子（(i in )）：
+1. 其 4 個頂點在頂點緩衝區 (Vertex Buffer) 中的**起始編號**為：
+   [text{baseVertex} = i times 4]
+2. 其 12 個全域索引在 Index Buffer 中的寫入公式如下：
+
+```swift
+// Swift 初始化階段寫入靜態 Index Buffer 的算式
+for i in 0..<particleCount {
+    let baseVertex = UInt32(i * 4)
+    let baseIndex  = i * 12
+    
+    // 面 1 (0, 1, 2)
+    indices[baseIndex + 0] = baseVertex + 0
+    indices[baseIndex + 1] = baseVertex + 1
+    indices[baseIndex + 2] = baseVertex + 2
+    
+    // 面 2 (0, 2, 3)
+    indices[baseIndex + 3] = baseVertex + 0
+    indices[baseIndex + 4] = baseVertex + 2
+    indices[baseIndex + 5] = baseVertex + 3
+    
+    // 面 3 (0, 3, 1)
+    indices[baseIndex + 6] = baseVertex + 0
+    indices[baseIndex + 7] = baseVertex + 3
+    indices[baseIndex + 8] = baseVertex + 1
+    
+    // 面 4 (1, 3, 2)
+    indices[baseIndex + 9]  = baseVertex + 1
+    indices[baseIndex + 10] = baseVertex + 3
+    indices[baseIndex + 11] = baseVertex + 2
+}
+```
+
+### 3. 靜態預計算與效能優勢
+
+* **一次性預計算**：這 1,200,000 個索引在系統初始化的 `setupBuffers()` 階段一次性寫入 `MTLBuffer`。
+* **零 CPU 負擔 (Zero CPU Overhead)**：由於拓樸結構固定，執行期索引緩衝區完全維持靜態。每一幀只需由 Metal Compute Shader 動態更新 Vertex Buffer 中的頂點座標，即可達成 90 FPS 零掉幀渲染。
+
+---
+## 40-Byte Stride
+
+- 共享結構定義 **`ParticleTypes.h`** 中，`LowLevelMesh` 的頂點結構 **`VertexData`** 總步距（Stride）為 **40 Bytes**，其計算是由各欄位的型別大小與 Offset 累加而得：
+
+
+### 1. 欄位記憶體大小拆解
+
+`VertexData` 結構包含三個欄位：`position`、`normal` 與 `color`。各欄位的記憶體佔用計算如下：
+
+* **`packed_float3 position` (12 Bytes / Offset 0)**：
+  * 由 3 個 32-bit（4 Bytes）浮點數 `(x, y, z)` 組成。
+  * 計算：(3 times 4 text{ Bytes} = mathbf{12 text{ Bytes}})。
+* **`packed_float3 normal` (12 Bytes / Offset 12)**：
+  * 由 3 個 32-bit（4 Bytes）浮點數 `(nx, ny, nz)` 組成。
+  * 計算：(3 times 4 text{ Bytes} = mathbf{12 text{ Bytes}})。
+  * 位移（Offset）：在 `position` 之後，位移量為 (0 + 12 = mathbf{12 text{ Bytes}})。
+* **`float4 color` (16 Bytes / Offset 24)**：
+  * 由 4 個 32-bit（4 Bytes）浮點數 `(r, g, b, a)` 組成。
+  * 計算：(4 times 4 text{ Bytes} = mathbf{16 text{ Bytes}})。
+  * 位移（Offset）：在 `normal` 之後，位移量為 (12 + 12 = mathbf{24 text{ Bytes}})。
+
+
+### 2. 總步距（Total Stride）加總算式
+
+- 將三個欄位的位元組相加：
+
+$$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\text{normal}} + \underbrace{16}_{\text{color}} = \mathbf{40 \text{ Bytes}} \quad$$
+
+### 3. 關鍵設計：為何使用 `packed_float3` 而非 `float3`？
+
+* **`float3` 的隱形 Padding**：在 Metal 中，標準的 `float3` 預設以 **16-Byte** 對齊（與 `float4` 相同，末端會強制補滿 4 Bytes 的空白 Padding）。若使用 `float3`，結構會膨脹為 (16 + 16 + 16 = 48 Bytes )。
+* **`packed_float3` 的緊湊佈局**：專案改採 `packed_float3`，取消強制 16-Byte 對齊，精確佔用 **12 Bytes**，成功將單一頂點大小縮減至 **40 Bytes**。這不僅節省了 16.7% 的頂點緩衝區記憶體，更極大地提升了 GPU L1/L2 快取的命中率與傳輸頻寬。
+
+在 Swift 端配置 `LowLevelMesh` 時，將 `vertexLayout.stride` 精確指定為 **40**，即可讓 RealityKit 渲染器與 Metal Compute Shader 直接共享同一塊 `MTLBuffer` 進行無縫讀寫。
+
+
+---
 ## 📄 授權協議 (License)
 
 - 本專案採用 [MIT License](LICENSE) 授權。歡迎自由 Fork、修改與應用於你的 visionOS 專案中！
