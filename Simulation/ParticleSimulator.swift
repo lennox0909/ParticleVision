@@ -67,8 +67,8 @@ class ParticleSimulator {
         self.params = SimParams(
             dt: 0.016,
             friction: 0.95,
-            rMax: 0.3,
-            rMin: 0.05,
+            rMax: 0.12,   // ✨ 核心修改：嚴格小於 0.125，確保不跨越相鄰網格邊界
+            rMin: 0.035,  // ✨ 對應縮小：大約是 rMax 的 30%，保持細胞薄膜的厚度比例
             numTypes: UInt32(numTypes),
             particleCount: UInt32(particleCount)
         )

@@ -53,6 +53,16 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
         }
     }
 
+    // ✨ 新增：利用空間座標與粒子 id 產生極微小的偽隨機擾動 (布朗運動)
+    float3 jitter = float3(
+            fract(sin(dot(p.position.xy + float(id), float2(12.9898, 78.233))) * 43758.5453),
+            fract(sin(dot(p.position.yz - float(id), float2(39.346, 11.135))) * 43758.5453),
+            fract(sin(dot(p.position.zx + float(id), float2(73.156, 52.235))) * 43758.5453)
+    ) * 2.0 - 1.0;
+
+    // 將微小擾動加入總受力中 (0.5f 是一個夠小且能打破晶格對稱性的魔法數字)
+    force += jitter * 0.5f;
+    
     p.velocity += force * params.dt;
     p.velocity *= params.friction;
     p.position += p.velocity * params.dt;
