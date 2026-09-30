@@ -28,6 +28,7 @@
 - **十萬級粒子渲染 (`LowLevelMesh`)**：捨棄傳統的獨立實體 (Entity)，改用純 GPU 驅動的自訂網格。透過「四面體幾何降級 (4 頂點/12 索引)」，在 visionOS 上流暢渲染 **100,000 顆** PBR 發光粒子。
 - **空間雜湊 (Spatial Hashing)**：將 $O(N^2)$ 的碰撞複雜度降至 $O(N)$，並將空間網格最佳化至 $32^3$ (32,768 格)美平衡 Prefix Sum 負載與記憶體快取命中率。
 - **GPU 空間排序 (Spatial Sorting)**：實作計數排序與前綴和，確保物理空間相近的粒子在 GPU 記憶體中絕對連續，榨出硬體效能。
+- **物理模擬崩壞現象 (Algorithm GPU Trap)的因應**：[網格狀排列現象 (Grid Artifacts)](#️-網格狀排列現象-grid-artifacts), [靜態風場效應 (Static Wind Field Effect)](#1-靜態風場效應-static-wind-field-effect), [方向性偏差 (Directional Bias)](#2-方向性偏差-directional-bias)
 
 ### 🖐️ 沉浸式實體反饋 (Scoop Net Physics)
 - **撈魚網物理學**：當使用者移動透明盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
