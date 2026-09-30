@@ -15,7 +15,7 @@
 
 ### Quick Start
 
-**[Technical Summary](#️-技術摘要-technical-summary) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#grid-sorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride)**
+**[Technical Summary](#️-技術摘要-technical-summary) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#grid-sorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride) · [Grid Artifacts](#️-網格狀排列現象-grid-artifacts)**
 
 </div>
 
@@ -508,23 +508,23 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 
 ---
 
-## 🕸️ 網格狀排列現象 (Grid Artifacts)
+## 🕸️ [網格狀排列現象 (Grid Artifacts)](#quick-start)
 
 ### 🔍 現象說明與成因
-在基於空間雜湊 (Spatial Hashing) 的粒子系統中，當粒子的引力搜尋半徑 (`rMax`) 大於單一空間網格的物理寬度時，就會在視覺上產生死板的「網格效應」[cite: 9]。
+在基於空間雜湊 (Spatial Hashing) 的粒子系統中，當粒子的引力搜尋半徑 (`rMax`) 大於單一空間網格的物理寬度時，就會在視覺上產生死板的「網格效應」。
 
-在目前的 $32^3$ 網格架構下，宇宙空間總寬度為 4.0，單一網格的寬度為 $4.0 \div 32 = 0.125$。因為 GPU 在運算時為了維持極高幀率，只會搜尋本身與周圍一圈（$3 \times 3 \times 3$）的鄰居網格。若 `rMax` 設定超過 0.125，原本應該是「球狀」的引力場，會在超出鄰居網格的邊界處被硬生生截斷，退化成「正方體」的引力場。粒子為了尋求物理受力平衡，最終就會沿著 X、Y、Z 軸整齊排列，形成如同積木或晶格般的方正結構[cite: 9]。
+在目前的 $32^3$ 網格架構下，宇宙空間總寬度為 4.0，單一網格的寬度為 $4.0 \div 32 = 0.125$。因為 GPU 在運算時為了維持極高幀率，只會搜尋本身與周圍一圈（$3 \times 3 \times 3$）的鄰居網格。若 `rMax` 設定超過 0.125，原本應該是「球狀」的引力場，會在超出鄰居網格的邊界處被硬生生截斷，退化成「正方體」的引力場。粒子為了尋求物理受力平衡，最終就會沿著 X、Y、Z 軸整齊排列，形成如同積木或晶格般的方正結構。
 
 
 ### 🛠️ 解決方法
 
-要徹底消除這種不自然的晶格排列，可以根據對效能與視覺的需求採用以下解法：
+- 要消除這種不自然的晶格排列，可以根據對效能與視覺的需求採用以下解法：
 
 #### 解法一：限制最大引力半徑 (維持極致效能)
 強制讓粒子的「視力」無法穿透相鄰的網格邊界，確保引力場維持完美的球體。
 - 將 `rMax` 設定為嚴格小於 0.125 的數值（例如：`0.12`）。
 - 同步按比例縮小斥力半徑 `rMin`（約維持在 `rMax` 的 30%，例如 `0.035`）。
-- **優點**：能繼續維持 $32^3$ 網格架構，確保 GPU 記憶體快取處於最高效率，完美支撐十萬顆粒子的運算。
+- **優點**：能繼續維持 $32^3$ 網格架構，確保 GPU 記憶體快取處於最高效率，支撐十萬顆粒子的運算。
 
 #### 解法二：降級網格密度 (保留長距離引力)
 如果希望粒子具備更遠的互動距離，以聚集成更龐大的星系或薄膜結構，就必須擴大單一網格的體積。
