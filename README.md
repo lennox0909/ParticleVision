@@ -15,7 +15,7 @@
 
 ### Quick Start
 
-**[Technical Summary](#️-技術摘要-technical-summary) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#grid-sorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride) · [Grid Artifacts](#️-網格狀排列現象-grid-artifacts)**
+**[Technical Summary](#️-技術摘要-technical-summary) · [Project Structure](#-專案結構-project-structure) · [Under the Hood](#️-運作原理-under-the-hood) · [Grid Sorting ](#grid-sorting-and-前綴和-prefix-sum--排序-counting-sort) · [Memory Alignment](#memory-alignment) · [Local Indices](#local-indices) · [40-Byte Stride](#40-byte-stride) · [Grid Artifacts](#️-網格狀排列現象-grid-artifacts) · [Static Wind Field & Directional Bias](#️-靜態風場效應與方向性偏差-static-wind-field--directional-bias)**
 
 </div>
 
@@ -537,7 +537,58 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 - 在 Metal Compute Shader 計算完總受力 (`force`) 後，利用空間座標與粒子 ID 產生極微小的偽隨機向量。
 - 將此隨機擾動 (Jitter) 疊加到受力中。
 - **優點**：能以極低的運算成本破壞不自然的完美對稱，讓細胞群聚與排斥的邊緣顯得更加有機且真實。通常建議與「解法一」搭配使用，以達到效能與視覺的最佳平衡。
+---
+## 🌪️ [靜態風場效應與方向性偏差 (Static Wind Field & Directional Bias)](#quick-start)
 
+### ⚠️ 錯誤成因分析
+
+在 GPU 物理模擬中，當我們試圖用數學函數 (如 `sin` 與 `fract`) 為粒子加入隨機擾動來打破網格對稱性時，極易落入兩個經典的隨機數陷阱，導致粒子全部被擠壓到透明盒子的某一面：
+
+#### 1. 靜態風場效應 (Static Wind Field Effect)
+如果你依賴「空間座標 (`p.position`)」作為亂數種子，會產生一個致命問題：**在空間中同一個座標點上，產生的隨機向量永遠是相同的。**
+這等於在透明盒子裡建立了一個「隱形的 3D 向量風場」。當粒子游走到特定位置時，總是會被同一股力量往同一個方向推。隨著時間推移，粒子就會像落葉順著海流一樣，全部被「吹」到風場的盡頭（也就是盒子的特定牆面），而無法形成原地隨機震動。
+
+#### 2. 方向性偏差 (Directional Bias)
+使用 `fract(sin(dot(...)))` 這種基於浮點數的偽隨機函數，在 GPU 硬體上存在先天的缺陷。
+由於浮點數精度的限制與 `sin` 函數的分佈特性，它產生的數值**並不是絕對均勻的**。這意味著長時間加總下來，這股隨機力量的平均值不是 `(0, 0, 0)`，而是帶有微弱的淨推力 (Net Force)。這個不為零的平均值，讓粒子感受到彷彿有某一面牆壁具備異常的「重力」。
+
+---
+
+### 🛠️ 終極解決方案：動態種子與高品質整數雜湊
+
+要實作真正的物理「布朗運動 (Brownian Motion)」，我們必須滿足兩個條件：**擾動方向每幀都在變 (動態性)**，且**長期平均受力必須為零 (均勻對稱性)**。
+
+以下是工業級 GPU 渲染中標準的解法：
+
+#### 1. 引入動態種子 (Dynamic Seed)
+將粒子的「當前速度 (`p.velocity`)」與「粒子編號 (`id`)」透過 XOR 位元運算結合。因為粒子的速度在每一幀都會被引力或摩擦力改變，這保證了即使粒子停留在同一個空間座標，下一幀的擾動方向也會瞬間改變，徹底打破靜態風場。
+
+#### 2. 改用 PCG 變體的高品質整數雜湊 (Integer Hashing)
+捨棄浮點數的 `sin()` 函數，改用純位元運算 (Bitwise Shift & XOR) 來打亂硬體層級的位元。這種雜湊演算法能保證產生出分佈絕對均勻的整數，最後再將其映射回 `-1.0 ~ 1.0` 的浮點數。這確保了 XYZ 三個方向的推力機率完美對稱，徹底消除方向性偏差。
+
+**Metal 實作程式碼：**
+
+```metal
+// 1. 動態種子：利用 id 與「當前速度」混合 (使用 as_type 將 float 轉為 uint 進行位元運算)
+uint seed = id ^ as_type<uint>(p.velocity.x) ^ as_type<uint>(p.velocity.y) ^ as_type<uint>(p.velocity.z);
+
+// 2. 高品質整數雜湊 (PCG Hash 變體)：徹底打亂位元，確保數值分佈絕對均勻
+seed ^= seed >> 16;
+seed *= 0x85ebca6b;
+seed ^= seed >> 13;
+seed *= 0xc2b2ae35;
+seed ^= seed >> 16;
+
+// 3. 位元遮罩與浮點數映射：精確轉換至 -1.0 ~ 1.0 之間
+float rx = float(seed & 0x3FF) / 1023.0 * 2.0 - 1.0;
+float ry = float((seed >> 10) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+float rz = float((seed >> 20) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+
+float3 jitter = float3(rx, ry, rz);
+
+// 4. 套用無偏差的微小擾動
+force += jitter * 0.1f;
+```
 ---
 ## 📄 授權協議 (License)
 
