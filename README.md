@@ -392,6 +392,7 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 #### 2. 方向性偏差 (Directional Bias)
 使用 `fract(sin(dot(...)))` 這種基於浮點數的偽隨機函數，在 GPU 硬體上存在先天的缺陷。
 由於浮點數精度的限制與 `sin` 函數的分佈特性，它產生的數值**並不是絕對均勻的**。這意味著長時間加總下來，這股隨機力量的平均值不是 `(0, 0, 0)`，而是帶有微弱的淨推力 (Net Force)。這個不為零的平均值，讓粒子感受到彷彿有某一面牆壁具備異常的「重力」。
+
 ![](./svg_img/invisible_wind.svg)
 
 ---
