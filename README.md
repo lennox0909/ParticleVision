@@ -32,7 +32,6 @@
 
 ### 🖐️ 沉浸式實體反饋 (Scoop Net Physics)
 - **撈魚網物理學**：當使用者移動透明盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
-![](./svg_img/ScoopNetPhysics.svg)
 - **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
 ![](./svg_img/handSkeleton.svg)
 
@@ -50,7 +49,6 @@
 解決 visionOS 多個高難度的效能與渲染痛點：
 1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的`頂點` (`Vertex`) 與`法線`(`Normal Vector`)緩衝區 (`Vertex Buffer`)，實現十萬顆粒子 90 FPS 表現。
 2. **解決射線偵測 (Raycast) 盲區**：將單一實心碰撞體重構為 12 道精準的邊緣碰撞條 (Edge Shapes)，消除 UI 遮蔽死角，提升手勢命中的穩定度。
-![](./svg_img/gestureLanding.svg)
 3. **視窗排版**：用適當的最小長寬限制搭配安全邊距，根除系統預設圓角造成的 UI 跑版與邊緣裁切問題。
 
 ---
@@ -132,31 +130,31 @@
     - 一個是用於顯示 2D UI 的 `WindowGroup`（負責載入 `ContentView`）
     - 另一個是預備用來渲染 3D 空間的 `ImmersiveSpace`（綁定 `ImmersiveView`），並同步初始化全域的環境狀態。
 
-![Stage1](./svg_img/Stage1.svg)
+![](./svg_img/Stage1.svg)
 
 ### 2. 2D 視窗渲染與 UI 實例化
 - 系統接著繪製 `ContentView.swift`，並根據程式碼中設定的 `frame(width: 750, height: 850)` 向 visionOS 請求一塊精確大小的 2D 視窗，並套用系統原生的玻璃背景效果（Glass Background）。
 - 此時 `ControlPanelView.swift` 內的各項滑桿與按鈕也一併實例化，進入等待使用者互動的就緒狀態。
 
-![Stage2](./svg_img/Stage2.svg)
+![](./svg_img/Stage2.svg)
 
 ### 3. Metal GPU 引擎與記憶體預熱
 - 當負責核心運算的 `ParticleSimulator` 被實例化時，會立即觸發底層的 `setupMetal()` 與 `setupBuffers()`。
 - 此階段 CPU 會向 Apple Silicon 晶片請求建立 Command Queue，編譯 `ParticlePhysics.metal` 與 `GridSorting.metal` 成可執行的 Compute Pipeline，並在實體記憶體中配置容納 10 萬顆粒子與 $32^3$ 空間網格所需的 `MTLBuffer`，最後建立 `LowLevelMesh` 準備承接巨量的頂點資料。
 
-![Stage3](./svg_img/Stage3.svg)
+![](./svg_img/Stage3.svg)
 
 ### 4. 沉浸式空間轉換 (Immersive Transition)
 - 當使用者點擊「啟動十萬粒子宇宙」時，按鈕觸發 `openImmersiveSpace` API。
 - visionOS 接到指令後，會平滑地將應用程式狀態切換至沉浸模式（Mixed Reality），解鎖立體空間的渲染權限，並開始執行 `ImmersiveView.swift` 的載入邏輯。
 
-![Stage4](./svg_img/Stage4.svg)
+![](./svg_img/Stage4.svg)
 
 ### 5. RealityKit 場景建構與 ARKit 啟動
 - 在 `ImmersiveView` 中，RealityKit 會先生成核心的透明實體 `containerBox`，並利用 `Entity+Extensions.swift` 附加 12 道隱形的碰撞邊界組件（CollisionComponent）。
 - 同時，非同步任務（Task）會向系統請求手部骨架追蹤權限，啟動 `ARKitSession` 與 `HandTrackingProvider`，開始捕捉雙手的 6-DOF 空間座標。
 
-![Stage5](./svg_img/Stage5.svg)
+![](./svg_img/Stage5.svg)
 
 ### 6. 渲染迴圈 (Render Loop) 與 GPU 交接
 - 一切就緒後，視圖會訂閱 `SceneEvents.Update.self`，將每秒最高 90 次的畫面更新權正式交棒給模擬器。
@@ -167,7 +165,7 @@
 
 - 至此，整個粒子宇宙開始無縫運轉。
 
-![Stage6](./svg_img/Stage6.svg)
+![](./svg_img/Stage6.svg)
 
 ---
 ## [Grid Sorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
