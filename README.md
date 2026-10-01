@@ -50,6 +50,7 @@
 解決 visionOS 多個高難度的效能與渲染痛點：
 1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的`頂點` (`Vertex`) 與`法線`(`Normal Vector`)緩衝區 (`Vertex Buffer`)，實現十萬顆粒子 90 FPS 表現。
 2. **解決射線偵測 (Raycast) 盲區**：將單一實心碰撞體重構為 12 道精準的邊緣碰撞條 (Edge Shapes)，消除 UI 遮蔽死角，提升手勢命中的穩定度。
+![](./svg_img/gestureLanding.svg)
 3. **視窗排版**：用適當的最小長寬限制搭配安全邊距，根除系統預設圓角造成的 UI 跑版與邊緣裁切問題。
 
 ---
