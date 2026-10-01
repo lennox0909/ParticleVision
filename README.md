@@ -129,169 +129,31 @@
     - 一個是用於顯示 2D UI 的 `WindowGroup`（負責載入 `ContentView`）
     - 另一個是預備用來渲染 3D 空間的 `ImmersiveSpace`（綁定 `ImmersiveView`），並同步初始化全域的環境狀態。
 
-```mermaid
----
-title: "階段一：App 進入點與生命週期註冊 (Stage 1: App Entry & Lifecycle)"
----
-flowchart TD
-    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef stateNode fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
-    classDef startEnd fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000,rx:10,ry:10;
-
-    S(["系統啟動<br/>(System Launch)"]):::startEnd
-    F_Plist[("設定檔確認<br/>(Info.plist)")]:::fileNode
-    F_App[("主程式進入點<br/>(ParticleVisionApp)")]:::fileNode
-    
-    A1(["註冊核心場景<br/>(Register Scenes)"]):::actionNode
-    A2(["初始化全域狀態<br/>(Init Global State)"]):::actionNode
-
-    subgraph "場景容器 (Scene Containers)"
-        direction LR
-        S_Win[("2D 視窗容器<br/>(WindowGroup)")]:::stateNode
-        S_Imm[("3D 空間容器<br/>(ImmersiveSpace)")]:::stateNode
-    end
-
-    S --> F_Plist
-    F_Plist -->|"讀取權限<br/>(Read Perms)"| F_App
-    F_App --> A2
-    F_App --> A1
-    A1 --> S_Win & S_Imm
-```
+![](./svg_img/階段一.svg)
 
 ### 2. 2D 視窗渲染與 UI 實例化
 - 系統接著繪製 `ContentView.swift`，並根據程式碼中設定的 `frame(width: 750, height: 850)` 向 visionOS 請求一塊精確大小的 2D 視窗，並套用系統原生的玻璃背景效果（Glass Background）。
 - 此時 `ControlPanelView.swift` 內的各項滑桿與按鈕也一併實例化，進入等待使用者互動的就緒狀態。
 
-```mermaid
----
-title: "階段二：2D 視窗渲染與 UI 實例化 (Stage 2: 2D UI Render & Init)"
----
-flowchart TD
-    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef visualNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
-
-    F_Content[("主視圖渲染<br/>(ContentView)")]:::fileNode
-    
-    subgraph "視窗建構 (Window Build)"
-        direction LR
-        A1(["請求精確尺寸<br/>(Request Frame)"]):::actionNode
-        V_Glass(["套用玻璃背景<br/>(Glass Background)"]):::visualNode
-        A1 --> V_Glass
-    end
-
-    subgraph "控制介面實例化 (UI Controls Init)"
-        direction LR
-        F_Panel[("控制面板<br/>(ControlPanelView)")]:::fileNode
-        A2(["綁定滑桿與按鈕<br/>(Bind Sliders/Btns)"]):::actionNode
-        F_Panel --> A2
-    end
-
-    S_Ready(["等待使用者互動<br/>(Ready for Interaction)"]):::visualNode
-
-    F_Content --> A1
-    F_Content --> F_Panel
-    V_Glass --> S_Ready
-    A2 --> S_Ready
-```
+![](./svg_img/階段二.svg)
 
 ### 3. Metal GPU 引擎與記憶體預熱
 - 當負責核心運算的 `ParticleSimulator` 被實例化時，會立即觸發底層的 `setupMetal()` 與 `setupBuffers()`。
 - 此階段 CPU 會向 Apple Silicon 晶片請求建立 Command Queue，編譯 `ParticlePhysics.metal` 與 `GridSorting.metal` 成可執行的 Compute Pipeline，並在實體記憶體中配置容納 10 萬顆粒子與 $32^3$ 空間網格所需的 `MTLBuffer`，最後建立 `LowLevelMesh` 準備承接巨量的頂點資料。
 
-```mermaid
----
-title: "階段三：Metal GPU 引擎與記憶體預熱 (Stage 3: Metal GPU & Memory)"
----
-flowchart TD
-    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef hwNode fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
-
-    F_Sim[("模擬器實例化<br/>(ParticleSimulator)")]:::fileNode
-    A1(["觸發硬體設定<br/>(Trigger Setup)"]):::actionNode
-
-    subgraph "GPU 管線編譯 (GPU Pipeline)"
-        direction LR
-        HW_Queue(["建立指令佇列<br/>(Command Queue)"]):::hwNode
-        A2(["編譯著色器<br/>(Compile Shaders)"]):::actionNode
-        HW_Queue --> A2
-    end
-
-    subgraph "記憶體配置 (Memory Allocation)"
-        direction LR
-        A3(["配置十萬粒子緩衝<br/>(Alloc MTLBuffer)"]):::actionNode
-        HW_Mesh(["建立底層網格<br/>(LowLevelMesh)"]):::hwNode
-        A3 --> HW_Mesh
-    end
-
-    F_Sim --> A1
-    A1 --> HW_Queue
-    A1 --> A3
-```
+![](./svg_img/階段三.svg)
 
 ### 4. 沉浸式空間轉換 (Immersive Transition)
 - 當使用者點擊「啟動十萬粒子宇宙」時，按鈕觸發 `openImmersiveSpace` API。
 - visionOS 接到指令後，會平滑地將應用程式狀態切換至沉浸模式（Mixed Reality），解鎖立體空間的渲染權限，並開始執行 `ImmersiveView.swift` 的載入邏輯。
 
-```mermaid
----
-title: "階段四：沉浸式空間轉換 (Stage 4: Immersive Transition)"
----
-flowchart TD
-    classDef trigger fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef stateNode fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
-
-    T_Btn(["點擊啟動宇宙按鈕<br/>(Tap Start Button)"]):::trigger
-    A1(["呼叫空間 API<br/>(openImmersiveSpace)"]):::actionNode
-    
-    subgraph "系統狀態切換 (OS State Switch)"
-        direction LR
-        S_MR(["切換至混合實境<br/>(Switch to MR)"]):::stateNode
-        A2(["解鎖 3D 渲染權限<br/>(Unlock 3D Render)"]):::actionNode
-        S_MR --> A2
-    end
-
-    F_Imm[("載入沉浸視圖邏輯<br/>(Load ImmersiveView)")]:::stateNode
-
-    T_Btn --> A1 --> S_MR
-    A2 --> F_Imm
-```
+![](./svg_img/階段四.svg)
 
 ### 5. RealityKit 場景建構與 ARKit 啟動
 - 在 `ImmersiveView` 中，RealityKit 會先生成核心的透明實體 `containerBox`，並利用 `Entity+Extensions.swift` 附加 12 道隱形的碰撞邊界組件（CollisionComponent）。
 - 同時，非同步任務（Task）會向系統請求手部骨架追蹤權限，啟動 `ARKitSession` 與 `HandTrackingProvider`，開始捕捉雙手的 6-DOF 空間座標。
 
-```mermaid
----
-title: "階段五：RealityKit 場景與 ARKit (Stage 5: RealityKit & ARKit)"
----
-flowchart TD
-    classDef fileNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef arNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
-
-    F_Imm[("沉浸視圖執行<br/>(ImmersiveView)")]:::fileNode
-
-    subgraph "實體建構 (Entity Build)"
-        direction LR
-        A1(["生成透明容器<br/>(Gen containerBox)"]):::actionNode
-        A2(["附加 12 道碰撞邊界<br/>(Add Collision)"]):::actionNode
-        A1 --> A2
-    end
-
-    subgraph "ARKit 感測器 (ARKit Sensors)"
-        direction LR
-        A3(["請求手部追蹤權限<br/>(Request Hand Tracking)"]):::actionNode
-        AR_Sys(["啟動骨架捕捉<br/>(ARKit & HandTracking)"]):::arNode
-        A3 --> AR_Sys
-    end
-
-    F_Imm --> A1
-    F_Imm --> A3
-```
+![](./svg_img/階段五.svg)
 
 ### 6. 渲染迴圈 (Render Loop) 與 GPU 交接
 - 一切就緒後，視圖會訂閱 `SceneEvents.Update.self`，將每秒最高 90 次的畫面更新權正式交棒給模擬器。
@@ -302,34 +164,8 @@ flowchart TD
 
 - 至此，整個粒子宇宙開始無縫運轉。
 
-```mermaid
----
-title: "階段六：渲染迴圈與 GPU 交接 (Stage 6: Render Loop & GPU)"
----
-flowchart TD
-    classDef loopNode fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
-    classDef actionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
-    classDef hwNode fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#000;
-    classDef endNode fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000,rx:10,ry:10;
+![](./svg_img/階段六.svg)
 
-    L_Start{"90Hz 更新迴圈<br/>(SceneEvents.Update)"}:::loopNode
-
-    subgraph "每幀執行步驟 (Per-Frame Steps)"
-        direction TB
-        A1(["客製手勢更新座標<br/>(Update Box via Gesture)"]):::actionNode
-        A2(["派發 GPU 運算指令<br/>(Dispatch updateSimulation)"]):::actionNode
-        HW_Calc(["空間雜湊與碰撞計算<br/>(Spatial Hash & Collision)"]):::hwNode
-        A3(["同步頂點至網格<br/>(Sync to LowLevelMesh)"]):::actionNode
-        
-        A1 --> A2 --> HW_Calc --> A3
-    end
-
-    E_Run(["粒子宇宙無縫運轉<br/>(Universe Running)"]):::endNode
-
-    L_Start --> A1
-    A3 --> L_Start
-    A3 --> E_Run
-```
 ---
 ## [Grid Sorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
 
@@ -342,6 +178,7 @@ flowchart TD
 * **計算 Grid Index**：在第一個 Compute Kernel 中，GPU 會同步讀取 10 萬顆粒子的 3D 座標，並透過雜湊函式計算出每顆粒子落在第幾個格子（Grid Index）。
 * **原子加總 (Atomic Addition)**：使用 Metal 的原子操作計數器，累加每個格子內的粒子總數（Cell Count），為計數排序建立直方圖。
 
+[](./svg_img/階段一.svgsvg)
 
 ### 2. GPU 前綴和計算 (Prefix Sum / Inclusive & Exclusive Scan)
 前綴和演算法的核心作用，是將 **「各格子的粒子數量」轉換為「該格子粒子在重排緩衝區中的起始記憶體位移 (Offset)」**：
