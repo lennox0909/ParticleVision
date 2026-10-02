@@ -36,7 +36,8 @@
 - **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
 
 
-<img src="./imgAssets/scoop-net-physics.svg" width="400"><img src="./imgAssets/palm-skeleton.svg" height="400">
+<img src="./imgAssets/scoop-net-physics.svg" width="400" alt="chart">
+<img src="./imgAssets/palm-skeleton.svg" height="400" alt="chart">
 
 ### 🎛️ 即時動態控制面板 (SwiftUI)
 無邊緣裁切、適配玻璃背景的空間浮動視窗，支援即時監測與調整：
@@ -73,7 +74,7 @@
 4. **互動與碰撞**：單手捏合 (Pinch) 邊界盒子的任一處並拖曳，像拿著網子一樣在空間中撈取粒子，體驗真實的推擠與反彈動能。
 
 
-<img src="./imgAssets/12-edge-eye-landing.svg" width="400">
+<img src="./imgAssets/12-edge-eye-landing.svg" width="400" alt="chart">
 
 ---
 ## 📂 [專案結構 (Project Structure)](#quick-start)
@@ -194,7 +195,7 @@
 * **定義記憶體邊界**：前綴和運算結果會直接記錄每個 `Cell` 的 `startIndex` 與 `endIndex`，明確劃分出每個網格在全局陣列中的存放區間。
 
 
-<img src="./imgAssets/spacial-hashing.svg" width="400">
+<img src="./imgAssets/spacial-hashing.svg" width="400" alt="chart">
 
 ### 3. 粒子記憶體重排 (Particle Scatter & Reordering)
 * **寫入連續記憶體 (`Sorted Particle Buffer`)**：根據前綴和算出的起始位移，GPU 再次平行派發指令，將 10 萬顆粒子寫入新的排序緩衝區。
@@ -251,7 +252,7 @@ vertexLayout.attributes = [
 vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 ```
 
-<img src="./imgAssets/dimensionality-reduction-mapping.png" width="400">
+<img src="./imgAssets/dimensionality-reduction-mapping.png" width="400" alt="chart">
 ---
 
 ### 4. 記憶體對齊帶來的極致效能
@@ -274,7 +275,7 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 * **面 4 (頂面)**：由頂點 `(1, 3, 2)` 組成
 
 
-<img src="./imgAssets/tetrahedral-unfolding-algorithm.svg" width="400">
+<img src="./imgAssets/tetrahedral-unfolding-algorithm.svg" width="400" alt="chart">
 
 每個三角形面由 3 個頂點索引組成，因此單一四面體的 **12 個局部索引順序** 為：
 
@@ -283,7 +284,7 @@ ${LocalIndices} = [\text{ 0, 1, 2,;  0, 2, 3,;  0, 3, 1,;  1, 3, 2 }]$
 > **頂點繞序 (Winding Order)**：索引順序嚴格遵循逆時針 (CCW) 順序，確保 GPU 渲染時 4 個面的幾何法線方向皆正確朝向體外。
 
 
-<img src="./imgAssets/CCW-outward-normal-vector.svg" width="400">
+<img src="./imgAssets/CCW-outward-normal-vector.svg" width="400" alt="chart">
 
 ### 2. 全局 10 萬顆粒子的索引位移公式 (Global Index Offset)
 
@@ -377,12 +378,12 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 
 
 <figure>
-    <img src="./imgAssets/abnormal-grid.svg" width="400">
+    <img src="./imgAssets/abnormal-grid.svg" width="400" alt="chart">
     <figcaption>Abnormal Grid.</figcaption>
 </figure>
 
 <figure>
-    <img src="./imgAssets/normal-particle-distribution.svg" width="400">
+    <img src="./imgAssets/normal-particle-distribution.svg" width="400" alt="chart">
     <figcaption>Natural Distribution.</figcaption>
 </figure>
 
@@ -397,7 +398,7 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 - **優點**：能繼續維持 $32^3$ 網格架構，確保 GPU 記憶體快取處於最高效率，支撐十萬顆粒子的運算。
 
 
-<img src="./imgAssets/gravitational-cutoff-effect.svg" width="400">
+<img src="./imgAssets/gravitational-cutoff-effect.svg" width="400" alt="chart">
 
 #### 解法二：降級網格密度 (保留長距離引力)
 如果希望粒子具備更遠的互動距離，以聚集成更龐大的星系或薄膜結構，就必須擴大單一網格的體積。
@@ -422,14 +423,14 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 這等於在透明盒子裡建立了一個「隱形的 3D 向量風場」。當粒子游走到特定位置時，總是會被同一股力量往同一個方向推。隨著時間推移，粒子就會像落葉順著海流一樣，全部被「吹」到風場的盡頭（也就是盒子的特定牆面），而無法形成原地隨機震動。
 
 
-<img src="./imgAssets/static-wind-field-effect.svg" width="400">
+<img src="./imgAssets/static-wind-field-effect.svg" width="400" alt="chart">
 
 #### 2. 方向性偏差 (Directional Bias)
 使用 `fract(sin(dot(...)))` 這種基於浮點數的偽隨機函數，在 GPU 硬體上存在先天的缺陷。
 由於浮點數精度的限制與 `sin` 函數的分佈特性，它產生的數值**並不是絕對均勻的**。這意味著長時間加總下來，這股隨機力量的平均值不是 `(0, 0, 0)`，而是帶有微弱的淨推力 (Net Force)。這個不為零的平均值，讓粒子感受到彷彿有某一面牆壁具備異常的「重力」。
 
 
-<img src="./imgAssets/physics-simulation-collapse.png" width="400">
+<img src="./imgAssets/physics-simulation-collapse.png" width="400" alt="chart">
 
 ---
 
