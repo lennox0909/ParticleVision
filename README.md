@@ -32,9 +32,9 @@
 
 ### 🖐️ 沉浸式實體反饋 (Scoop Net Physics)
 - **撈魚網物理學**：當使用者移動透明盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
-![](./svg_img/ScoopNetPhysics.svg)
+![](./imgAssets/scoop-net-physics.svg)
 - **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
-![](./svg_img/handSkeleton.svg)
+![](./imgAssets/palm-skeleton.svg)
 
 ### 🎛️ 即時動態控制面板 (SwiftUI)
 無邊緣裁切、適配玻璃背景的空間浮動視窗，支援即時監測與調整：
@@ -50,7 +50,7 @@
 解決 visionOS 多個高難度的效能與渲染痛點：
 1. **Zero CPU Overhead 渲染機制**：利用 Metal Compute Shader 每個 Frame 直接更新 `LowLevelMesh` 的`頂點` (`Vertex`) 與`法線`(`Normal Vector`)緩衝區 (`Vertex Buffer`)，實現十萬顆粒子 90 FPS 表現。
 2. **解決射線偵測 (Raycast) 盲區**：將單一實心碰撞體重構為 12 道精準的邊緣碰撞條 (Edge Shapes)，消除 UI 遮蔽死角，提升手勢命中的穩定度。
-![](./svg_img/gestureLanding.svg)
+
 3. **視窗排版**：用適當的最小長寬限制搭配安全邊距，根除系統預設圓角造成的 UI 跑版與邊緣裁切問題。
 
 ---
@@ -69,6 +69,7 @@
 2. 觀察高達 10 萬顆的四面體粒子，依據隨機生成的引力矩陣逐漸聚集成細胞、薄膜或絢麗的星系結構。
 3. **調整與觀察**：在控制面板即時監看 FPS，隨意拉動數量與發光強度，並隨時點擊「隨機引力規則」重組基因矩陣。
 4. **互動與碰撞**：單手捏合 (Pinch) 邊界盒子的任一處並拖曳，像拿著網子一樣在空間中撈取粒子，體驗真實的推擠與反彈動能。
+![](./imgAssets/12-edge-eye-landing.svg)
 
 ---
 ## 📂 [專案結構 (Project Structure)](#quick-start)
@@ -132,31 +133,31 @@
     - 一個是用於顯示 2D UI 的 `WindowGroup`（負責載入 `ContentView`）
     - 另一個是預備用來渲染 3D 空間的 `ImmersiveSpace`（綁定 `ImmersiveView`），並同步初始化全域的環境狀態。
 
-![](./svg_img/Stage1.svg)
+![](./imgAssets/Stage1.svg)
 
 ### 2. 2D 視窗渲染與 UI 實例化
 - 系統接著繪製 `ContentView.swift`，並根據程式碼中設定的 `frame(width: 750, height: 850)` 向 visionOS 請求一塊精確大小的 2D 視窗，並套用系統原生的玻璃背景效果（Glass Background）。
 - 此時 `ControlPanelView.swift` 內的各項滑桿與按鈕也一併實例化，進入等待使用者互動的就緒狀態。
 
-![](./svg_img/Stage2.svg)
+![](./imgAssets/Stage2.svg)
 
 ### 3. Metal GPU 引擎與記憶體預熱
 - 當負責核心運算的 `ParticleSimulator` 被實例化時，會立即觸發底層的 `setupMetal()` 與 `setupBuffers()`。
 - 此階段 CPU 會向 Apple Silicon 晶片請求建立 Command Queue，編譯 `ParticlePhysics.metal` 與 `GridSorting.metal` 成可執行的 Compute Pipeline，並在實體記憶體中配置容納 10 萬顆粒子與 $32^3$ 空間網格所需的 `MTLBuffer`，最後建立 `LowLevelMesh` 準備承接巨量的頂點資料。
 
-![](./svg_img/Stage3.svg)
+![](./imgAssets/Stage3.svg)
 
 ### 4. 沉浸式空間轉換 (Immersive Transition)
 - 當使用者點擊「啟動十萬粒子宇宙」時，按鈕觸發 `openImmersiveSpace` API。
 - visionOS 接到指令後，會平滑地將應用程式狀態切換至沉浸模式（Mixed Reality），解鎖立體空間的渲染權限，並開始執行 `ImmersiveView.swift` 的載入邏輯。
 
-![](./svg_img/Stage4.svg)
+![](./imgAssets/Stage4.svg)
 
 ### 5. RealityKit 場景建構與 ARKit 啟動
 - 在 `ImmersiveView` 中，RealityKit 會先生成核心的透明實體 `containerBox`，並利用 `Entity+Extensions.swift` 附加 12 道隱形的碰撞邊界組件（CollisionComponent）。
 - 同時，非同步任務（Task）會向系統請求手部骨架追蹤權限，啟動 `ARKitSession` 與 `HandTrackingProvider`，開始捕捉雙手的 6-DOF 空間座標。
 
-![](./svg_img/Stage5.svg)
+![](./imgAssets/Stage5.svg)
 
 ### 6. 渲染迴圈 (Render Loop) 與 GPU 交接
 - 一切就緒後，視圖會訂閱 `SceneEvents.Update.self`，將每秒最高 90 次的畫面更新權正式交棒給模擬器。
@@ -167,7 +168,7 @@
 
 - 至此，整個粒子宇宙開始無縫運轉。
 
-![](./svg_img/Stage6.svg)
+![](./imgAssets/Stage6.svg)
 
 ---
 ## [Grid Sorting and （前綴和 Prefix Sum / 排序 Counting Sort）](#quick-start)
@@ -181,18 +182,20 @@
 * **計算 Grid Index**：在第一個 Compute Kernel 中，GPU 會同步讀取 10 萬顆粒子的 3D 座標，並透過雜湊函式計算出每顆粒子落在第幾個格子（Grid Index）。
 * **原子加總 (Atomic Addition)**：使用 Metal 的原子操作計數器，累加每個格子內的粒子總數（Cell Count），為計數排序建立直方圖。
 
-[](./svg_img/階段一.svgsvg)
+![](./imgAssets/particle-index-buffer.png)
 
 ### 2. GPU 前綴和計算 (Prefix Sum / Inclusive & Exclusive Scan)
 前綴和演算法的核心作用，是將 **「各格子的粒子數量」轉換為「該格子粒子在重排緩衝區中的起始記憶體位移 (Offset)」**：
 * **前綴和位移計算**：對 32,768 個格子的數量陣列執行掃描計算。例如：若第 0 格有 5 顆粒子、第 1 格有 3 顆粒子，經 Exclusive Prefix Sum 計算後，第 0 格的起始偏移位址為 `0`，第 1 格為 `5`，第 2 格則為 `8`（`5 + 3`）。
 * **定義記憶體邊界**：前綴和運算結果會直接記錄每個 `Cell` 的 `startIndex` 與 `endIndex`，明確劃分出每個網格在全局陣列中的存放區間。
 
+![](./imgAssets/spacial-hashing.svg)
 
 ### 3. 粒子記憶體重排 (Particle Scatter & Reordering)
 * **寫入連續記憶體 (`Sorted Particle Buffer`)**：根據前綴和算出的起始位移，GPU 再次平行派發指令，將 10 萬顆粒子寫入新的排序緩衝區。
 * **極大化快取命中率 (Cache Hit Rate)**：完成排序後，**在物理空間中相近的粒子，在 GPU 記憶體中也會被絕對連續地排列**。
 
+![](./imgAssets/memory-reordering-matrix.png)
 
 ### 🌟 排序完成後的物理計算效益
 當後續的物理引擎 `ParticlePhysics.metal` 執行引力與斥力計算時，每顆粒子不再需要搜尋全域 10 萬顆粒子，而是直接查詢目標格子及其周圍相鄰的 27 個格子。由於這些格子的粒子資料在記憶體中高度連續，GPU Thread Group 讀取時能達到極高的 L1/L2 快取命中率，實現零 CPU 開銷的極致效能。
@@ -210,6 +213,7 @@
 * **Bridging Header 橋接**：透過 `particle-vision-Bridging-Header.h` 將 C 語言標頭檔 `ParticleTypes.h` 引入 Swift 中。
 * **單一真理來源 (Single Source of Truth)**：`ParticleTypes.h` 同時被 Swift (`ParticleSimulator+Metal.swift`) 與 Metal Shader (`ParticlePhysics.metal`) 引入。這確保了兩端在編譯時使用完全相同的 `struct` 欄位順序與型別宣告。
 
+![](./imgAssets/shared-memory-architecture.png)
 
 ### 2. Metal vector 型別的對齊規則 (Alignment Rules)
 Metal Shader 與 C/Swift 對於向量型別的預設對齊方式不同：
@@ -225,6 +229,7 @@ Metal Shader 與 C/Swift 對於向量型別的預設對齊方式不同：
       float4        color;    // 16 bytes (Offset 24)
   } VertexData; // 總 Stride = 40 bytes
   ```
+![](./imgAssets/40-byte-stride.svg)
 
 
 ### 3. Swift 端的 `LowLevelMesh` Layout 映射
@@ -240,6 +245,7 @@ vertexLayout.attributes = [
 ]
 vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 ```
+![](./imgAssets/dimensionality-reduction-mapping.png)
 
 ---
 
@@ -262,12 +268,15 @@ vertexLayout.stride = 40 // 必須精確等於 C/Metal 端 sizeof(VertexData)
 * **面 3 (側面 2)**：由頂點 `(0, 3, 1)` 組成
 * **面 4 (頂面)**：由頂點 `(1, 3, 2)` 組成
 
+![](./imgAssets/tetrahedral-unfolding-algorithm.svg)
+
 每個三角形面由 3 個頂點索引組成，因此單一四面體的 **12 個局部索引順序** 為：
 
 ${LocalIndices} = [\text{ 0, 1, 2,;  0, 2, 3,;  0, 3, 1,;  1, 3, 2 }]$
 
 > **頂點繞序 (Winding Order)**：索引順序嚴格遵循逆時針 (CCW) 順序，確保 GPU 渲染時 4 個面的幾何法線方向皆正確朝向體外。
 
+![](./imgAssets/CCW-outward-normal-vector.svg)
 
 ### 2. 全局 10 萬顆粒子的索引位移公式 (Global Index Offset)
 
@@ -333,6 +342,7 @@ for i in 0..<particleCount {
   * 計算：$$4 \times 4 \text{ Bytes} = 16 \text{ Bytes}$$。
   * 位移（Offset）：在 `normal` 之後，位移量為 $12 + 12 = 24 \text{ Bytes}$。
 
+![](./imgAssets/40-byte-allocation.png)
 
 ### 2. 總步距（Total Stride）加總算式
 
@@ -347,6 +357,8 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 
 在 Swift 端配置 `LowLevelMesh` 時，將 `vertexLayout.stride` 精確指定為 **40**，即可讓 RealityKit 渲染器與 Metal Compute Shader 直接共享同一塊 `MTLBuffer` 進行無縫讀寫。
 
+![](./imgAssets/why-not-float3.png)
+
 ---
 
 ## 🕸️ [網格狀排列現象 (Grid Artifacts)](#quick-start)
@@ -356,6 +368,7 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 
 在目前的 $32^3$ 網格架構下，宇宙空間總寬度為 4.0，單一網格的寬度為 $4.0 \div 32 = 0.125$。因為 GPU 在運算時為了維持極高幀率，只會搜尋本身與周圍一圈（$3 \times 3 \times 3$）的鄰居網格。若 `rMax` 設定超過 0.125，原本應該是「球狀」的引力場，會在超出鄰居網格的邊界處被硬生生截斷，退化成「正方體」的引力場。粒子為了尋求物理受力平衡，最終就會沿著 X、Y、Z 軸整齊排列，形成如同積木或晶格般的方正結構。
 
+![](./imgAssets/abnormal-grid.svg)
 
 ### 🛠️ 解決方法
 
@@ -366,6 +379,8 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 - 將 `rMax` 設定為嚴格小於 0.125 的數值（例如：`0.12`）。
 - 同步按比例縮小斥力半徑 `rMin`（約維持在 `rMax` 的 30%，例如 `0.035`）。
 - **優點**：能繼續維持 $32^3$ 網格架構，確保 GPU 記憶體快取處於最高效率，支撐十萬顆粒子的運算。
+
+![](./imgAssets/gravitational-cutoff-effect.svg)
 
 #### 解法二：降級網格密度 (保留長距離引力)
 如果希望粒子具備更遠的互動距離，以聚集成更龐大的星系或薄膜結構，就必須擴大單一網格的體積。
@@ -389,13 +404,13 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 如果你依賴「空間座標 (`p.position`)」作為亂數種子，會產生一個致命問題：**在空間中同一個座標點上，產生的隨機向量永遠是相同的。**
 這等於在透明盒子裡建立了一個「隱形的 3D 向量風場」。當粒子游走到特定位置時，總是會被同一股力量往同一個方向推。隨著時間推移，粒子就會像落葉順著海流一樣，全部被「吹」到風場的盡頭（也就是盒子的特定牆面），而無法形成原地隨機震動。
 
-![](./svg_img/static_wind.svg)
+![](./imgAssets/static-wind-field-effect.svg)
 
 #### 2. 方向性偏差 (Directional Bias)
 使用 `fract(sin(dot(...)))` 這種基於浮點數的偽隨機函數，在 GPU 硬體上存在先天的缺陷。
 由於浮點數精度的限制與 `sin` 函數的分佈特性，它產生的數值**並不是絕對均勻的**。這意味著長時間加總下來，這股隨機力量的平均值不是 `(0, 0, 0)`，而是帶有微弱的淨推力 (Net Force)。這個不為零的平均值，讓粒子感受到彷彿有某一面牆壁具備異常的「重力」。
 
-![](./svg_img/invisible_wind.svg)
+![](./imgAssets/physics-simulation-collapse.png)
 
 ---
 
