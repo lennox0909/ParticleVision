@@ -369,7 +369,7 @@ $$\text{Total Stride} = \underbrace{12}_{\text{position}} + \underbrace{12}_{\te
 
 在目前的 $32^3$ 網格架構下，宇宙空間總寬度為 4.0，單一網格的寬度為 $4.0 \div 32 = 0.125$。因為 GPU 在運算時為了維持極高幀率，只會搜尋本身與周圍一圈（$3 \times 3 \times 3$）的鄰居網格。若 `rMax` 設定超過 0.125，原本應該是「球狀」的引力場，會在超出鄰居網格的邊界處被硬生生截斷，退化成「正方體」的引力場。粒子為了尋求物理受力平衡，最終就會沿著 X、Y、Z 軸整齊排列，形成如同積木或晶格般的方正結構。
 
-![](./imgAssets/abnormal-grid.svg)
+![](./imgAssets/abnormal-grid.svg) ![](./imgAssets/normal-particle-distribution.svg)
 
 ### 🛠️ 解決方法
 
