@@ -34,7 +34,9 @@
 - **撈魚網物理學**：當使用者移動透明盒子時，Metal 端會即時計算相對慣性 (Inertia) 與穿透動能 (Penetration Impulse)，讓邊界具備將粒子「推擠撈起」的真實物理手感。
 
 - **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
-![](./imgAssets/scoop-net-physics.svg)![](./imgAssets/palm-skeleton.svg)
+
+
+<img src="./imgAssets/scoop-net-physics.svg" width="400"><img src="./imgAssets/palm-skeleton.svg" width="400">
 
 ### 🎛️ 即時動態控制面板 (SwiftUI)
 無邊緣裁切、適配玻璃背景的空間浮動視窗，支援即時監測與調整：
