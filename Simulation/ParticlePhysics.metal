@@ -53,15 +53,27 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
         }
     }
 
-    // ✨ 新增：利用空間座標與粒子 id 產生極微小的偽隨機擾動 (布朗運動)
-    float3 jitter = float3(
-            fract(sin(dot(p.position.xy + float(id), float2(12.9898, 78.233))) * 43758.5453),
-            fract(sin(dot(p.position.yz - float(id), float2(39.346, 11.135))) * 43758.5453),
-            fract(sin(dot(p.position.zx + float(id), float2(73.156, 52.235))) * 43758.5453)
-    ) * 2.0 - 1.0;
-
-    // 將微小擾動加入總受力中 (0.5f 是一個夠小且能打破晶格對稱性的魔法數字)
-    force += jitter * 0.5f;
+    // --- 替換原本的 Jitter 程式碼 ---
+        
+    // 1. 動態種子：利用 id 與「當前速度」混合。速度每幀都在變化，確保擾動方向不斷切換，打破靜態風場
+    uint seed = id ^ as_type<uint>(p.velocity.x) ^ as_type<uint>(p.velocity.y) ^ as_type<uint>(p.velocity.z);
+    
+    // 2. 高品質整數雜湊 (PCG Hash 變體)：確保分佈絕對均勻，徹底消除特定方向的引力偏差
+    seed ^= seed >> 16;
+    seed *= 0x85ebca6b;
+    seed ^= seed >> 13;
+    seed *= 0xc2b2ae35;
+    seed ^= seed >> 16;
+    
+    // 3. 提取三個均勻分佈的浮點數，將範圍精確映射至 -1.0 ~ 1.0
+    float rx = float(seed & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    float ry = float((seed >> 10) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    float rz = float((seed >> 20) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    
+    float3 jitter = float3(rx, ry, rz);
+    
+    // 4. 套用擾動 (因為現在的隨機性非常強且活躍，只需 0.1f 就足以打破網格對稱性)
+    force += jitter * 0.1f;
     
     p.velocity += force * params.dt;
     p.velocity *= params.friction;
