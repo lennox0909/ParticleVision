@@ -36,7 +36,7 @@
 - **骨架追蹤**：基於 ARKit 的手部骨架節點分析，實現單手 6-DOF 空間拖曳與雙手縮放。
 
 
-<img src="./imgAssets/scoop-net-physics.svg" width="400"><img src="./imgAssets/palm-skeleton.svg" width="400">
+<img src="./imgAssets/scoop-net-physics.svg" width="400"><img src="./imgAssets/palm-skeleton.svg" height="400">
 
 ### 🎛️ 即時動態控制面板 (SwiftUI)
 無邊緣裁切、適配玻璃背景的空間浮動視窗，支援即時監測與調整：
