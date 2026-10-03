@@ -136,7 +136,6 @@ struct RuleMatrixView: View {
             }
             .padding(4)
             .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-            
             // MARK: - 3. 2D 互動式矩陣網格 (Heat Map Grid)
             VStack(spacing: 4) {
                 HStack(spacing: 4) {

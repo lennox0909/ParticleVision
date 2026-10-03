@@ -131,6 +131,9 @@ struct ImmersiveView: View {
         .onChange(of: simulator.glowIntensity) { _, _ in
             updateParticleMaterials()
         }
+        .onChange(of: simulator.currentColors) { _, _ in
+            updateParticleMaterials()
+        }
         .onDisappear {
             frameSubscription?.cancel()
             frameSubscription = nil

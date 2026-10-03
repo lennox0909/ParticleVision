@@ -8,6 +8,8 @@ import SwiftUI
 
 @Observable
 class ParticleSimulator {
+    var showColorWindow: Bool = false
+    var showMatrixWindow: Bool = false
     var glowIntensity: Float = 0.0
     var meshResource: MeshResource!
     var lowLevelMesh: LowLevelMesh?
@@ -49,7 +51,7 @@ class ParticleSimulator {
         }
     }
     
-    // ✨ 三組獨立的 N x N 矩陣：作用力、最小半徑、最大半徑
+    // 三組獨立的 N x N 矩陣：作用力、最小半徑、最大半徑
     var ruleMatrix: [Float] = [] {
         didSet { updateRuleMatrixBuffer() }
     }
@@ -59,6 +61,10 @@ class ParticleSimulator {
     var rMaxMatrix: [Float] = [] {
         didSet { updateRuleMatrixBuffer() }
     }
+    
+    // ✨ 新增：當前選中的色票 ID 與生成的顏色陣列 (預設為 1: Rainbow)
+    var selectedPaletteID: Int = 1
+    var currentColors: [Color] = []
     
     init(particleCount: Int = 50000, numTypes: Int = 6) {
         self.particleCount = particleCount
@@ -72,11 +78,19 @@ class ParticleSimulator {
             particleCount: UInt32(particleCount)
         )
         
+        // 初始化預設色票
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: numTypes)
+        
         setupMetal()
         setupBuffers()
     }
     
-    /// 隨機重置引力與半徑矩陣
+    /// ✨ 套用或重新生成指定的 Color Scheme
+    func applyPalette(id: Int) {
+        self.selectedPaletteID = id
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: id, numTypes: numTypes)
+    }
+    
     func randomizeRules() {
         let matrixSize = numTypes * numTypes
         self.rMinMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.010...0.045) }
@@ -91,6 +105,9 @@ class ParticleSimulator {
         self.params.particleCount = UInt32(newCount)
         self.params.numTypes = UInt32(newTypes)
         self.params.friction = self.friction
+        
+        // ✨ 當粒子種類數改變時，根據當前選中的色票重新生成對應數量的顏色
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: newTypes)
         
         setupBuffers()
         self.needsVisualRebuild = true
@@ -232,18 +249,9 @@ class ParticleSimulator {
         self.rMaxMatrix = Array(repeating: value, count: numTypes * numTypes)
     }
     
-    /// 取得對應粒子種類的代表色（供 UI 顯示用）
+    /// ✨ 取得對應粒子種類的代表色（直接回傳當前動態色票陣列的顏色）
     func colorForType(_ type: Int) -> Color {
-        let colors: [Color] = [
-            Color(red: 0.90, green: 0.65, blue: 0.98), // 亮紫粉
-            Color(red: 0.20, green: 0.90, blue: 0.10), // 螢光綠
-            Color(red: 0.85, green: 0.90, blue: 0.25), // 檸檬黃
-            Color(red: 0.05, green: 0.40, blue: 1.00), // 寶石藍
-            Color(red: 0.65, green: 0.98, blue: 0.80), // 薄荷青
-            Color(red: 0.80, green: 0.78, blue: 0.00), // 芥末黃
-            Color(red: 0.80, green: 0.05, blue: 0.85), // 洋紅紫
-            Color(red: 1.00, green: 0.45, blue: 0.20)  // 珊瑚橘
-        ]
-        return colors[type % colors.count]
+        guard !currentColors.isEmpty else { return .white }
+        return currentColors[type % currentColors.count]
     }
 }
