@@ -4,15 +4,17 @@ import simd
 import Observation
 import RealityKit
 import QuartzCore
+import SwiftUI
 
 @Observable
 class ParticleSimulator {
-    // ✨ 新增這行：發光效果開關
+    var showColorWindow: Bool = false
+    var showMatrixWindow: Bool = false
     var glowIntensity: Float = 0.0
     var meshResource: MeshResource!
     var lowLevelMesh: LowLevelMesh?
     var updateMeshPipeline: MTLComputePipelineState!
-    // 移除 private，讓 Extension 可以跨檔案存取
+    
     var device: MTLDevice!
     var commandQueue: MTLCommandQueue!
     
@@ -33,22 +35,14 @@ class ParticleSimulator {
     var particleCount: Int
     var numTypes: Int
     
-    // ✨ 新增：FPS 相關狀態
     var currentFPS: Int = 0
     private var frameCount: Int = 0
     private var lastFPSUpdateTime: TimeInterval = 0
     
     var needsVisualRebuild: Bool = false
     
-    var particleScale: Float = 0.015 {
-        didSet {
-            guard oldValue > 0 else { return }
-            let scaleRatio = particleScale / oldValue
-            params.rMax *= scaleRatio
-            params.rMin *= scaleRatio
-            updateParamsBuffer()
-        }
-    }
+    // 只負責控制 3D 視覺外觀大小，與物理半徑完全解耦
+    var particleScale: Float = 0.015
     
     var friction: Float = 0.95 {
         didSet {
@@ -57,9 +51,20 @@ class ParticleSimulator {
         }
     }
     
+    // 三組獨立的 N x N 矩陣：作用力、最小半徑、最大半徑
     var ruleMatrix: [Float] = [] {
         didSet { updateRuleMatrixBuffer() }
     }
+    var rMinMatrix: [Float] = [] {
+        didSet { updateRuleMatrixBuffer() }
+    }
+    var rMaxMatrix: [Float] = [] {
+        didSet { updateRuleMatrixBuffer() }
+    }
+    
+    // ✨ 新增：當前選中的色票 ID 與生成的顏色陣列 (預設為 1: Rainbow)
+    var selectedPaletteID: Int = 1
+    var currentColors: [Color] = []
     
     init(particleCount: Int = 50000, numTypes: Int = 6) {
         self.particleCount = particleCount
@@ -67,18 +72,29 @@ class ParticleSimulator {
         self.params = SimParams(
             dt: 0.016,
             friction: 0.95,
-            rMax: 0.12,   // ✨ 核心修改：嚴格小於 0.125，確保不跨越相鄰網格邊界
-            rMin: 0.035,  // ✨ 對應縮小：大約是 rMax 的 30%，保持細胞薄膜的厚度比例
+            rMax: 0.12,
+            rMin: 0.035,
             numTypes: UInt32(numTypes),
             particleCount: UInt32(particleCount)
         )
+        
+        // 初始化預設色票
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: numTypes)
         
         setupMetal()
         setupBuffers()
     }
     
+    /// ✨ 套用或重新生成指定的 Color Scheme
+    func applyPalette(id: Int) {
+        self.selectedPaletteID = id
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: id, numTypes: numTypes)
+    }
+    
     func randomizeRules() {
         let matrixSize = numTypes * numTypes
+        self.rMinMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.010...0.045) }
+        self.rMaxMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.060...0.125) }
         self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
     }
     
@@ -89,6 +105,9 @@ class ParticleSimulator {
         self.params.particleCount = UInt32(newCount)
         self.params.numTypes = UInt32(newTypes)
         self.params.friction = self.friction
+        
+        // ✨ 當粒子種類數改變時，根據當前選中的色票重新生成對應數量的顏色
+        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: newTypes)
         
         setupBuffers()
         self.needsVisualRebuild = true
@@ -113,30 +132,126 @@ class ParticleSimulator {
         
         for i in 0..<particleCount {
             var p = pointer[i]
-            
             let pos4 = SIMD4<Float>(p.position, 1.0)
             let newPos4 = relativeTransform * pos4
             p.position = SIMD3<Float>(newPos4.x, newPos4.y, newPos4.z)
-            
             p.velocity = relativeRotation * p.velocity
-            
             pointer[i] = p
         }
     }
     
     func updateFPS() {
-            let currentTime = CACurrentMediaTime()
-            frameCount += 1
-            
-            // 每過 1 秒鐘，結算一次過去一秒內跑了幾幀
-            if currentTime - lastFPSUpdateTime >= 1.0 {
-                // 切換到 Main Thread 更新 UI 狀態
-                DispatchQueue.main.async {
-                    self.currentFPS = self.frameCount
-                    self.frameCount = 0
-                }
-                lastFPSUpdateTime = currentTime
+        let currentTime = CACurrentMediaTime()
+        frameCount += 1
+        
+        if currentTime - lastFPSUpdateTime >= 1.0 {
+            DispatchQueue.main.async {
+                self.currentFPS = self.frameCount
+                self.frameCount = 0
             }
+            lastFPSUpdateTime = currentTime
+        }
     }
     
+    // MARK: - 1. Forces (引力矩陣) 控制 API
+    
+    func getRule(from typeA: Int, to typeB: Int) -> Float {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < ruleMatrix.count else { return 0.0 }
+        return ruleMatrix[index]
+    }
+    
+    func setRule(from typeA: Int, to typeB: Int, value: Float) {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < ruleMatrix.count else { return }
+        ruleMatrix[index] = value
+    }
+    
+    func setRowRules(row: Int, value: Float) {
+        guard row >= 0 && row < numTypes else { return }
+        var updated = ruleMatrix
+        for col in 0..<numTypes { updated[row * numTypes + col] = value }
+        ruleMatrix = updated
+    }
+    
+    func setColRules(col: Int, value: Float) {
+        guard col >= 0 && col < numTypes else { return }
+        var updated = ruleMatrix
+        for row in 0..<numTypes { updated[row * numTypes + col] = value }
+        ruleMatrix = updated
+    }
+    
+    func setAllRules(value: Float = 0.0) {
+        self.ruleMatrix = Array(repeating: value, count: numTypes * numTypes)
+    }
+    
+    // MARK: - 2. Min. Radius (最小排斥半徑矩陣) 控制 API
+    
+    func getMinRadius(from typeA: Int, to typeB: Int) -> Float {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < rMinMatrix.count else { return 0.035 }
+        return rMinMatrix[index]
+    }
+    
+    func setMinRadius(from typeA: Int, to typeB: Int, value: Float) {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < rMinMatrix.count else { return }
+        rMinMatrix[index] = value
+    }
+    
+    func setRowMinRadius(row: Int, value: Float) {
+        guard row >= 0 && row < numTypes else { return }
+        var updated = rMinMatrix
+        for col in 0..<numTypes { updated[row * numTypes + col] = value }
+        rMinMatrix = updated
+    }
+    
+    func setColMinRadius(col: Int, value: Float) {
+        guard col >= 0 && col < numTypes else { return }
+        var updated = rMinMatrix
+        for row in 0..<numTypes { updated[row * numTypes + col] = value }
+        rMinMatrix = updated
+    }
+    
+    func setAllMinRadius(value: Float = 0.035) {
+        self.rMinMatrix = Array(repeating: value, count: numTypes * numTypes)
+    }
+    
+    // MARK: - 3. Max. Radius (最大感知半徑矩陣) 控制 API
+    
+    func getMaxRadius(from typeA: Int, to typeB: Int) -> Float {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < rMaxMatrix.count else { return 0.120 }
+        return rMaxMatrix[index]
+    }
+    
+    func setMaxRadius(from typeA: Int, to typeB: Int, value: Float) {
+        let index = typeA * numTypes + typeB
+        guard index >= 0 && index < rMaxMatrix.count else { return }
+        rMaxMatrix[index] = value
+    }
+    
+    func setRowMaxRadius(row: Int, value: Float) {
+        guard row >= 0 && row < numTypes else { return }
+        var updated = rMaxMatrix
+        for col in 0..<numTypes { updated[row * numTypes + col] = value }
+        rMaxMatrix = updated
+    }
+    
+    func setColMaxRadius(col: Int, value: Float) {
+        guard col >= 0 && col < numTypes else { return }
+        var updated = rMaxMatrix
+        for row in 0..<numTypes { updated[row * numTypes + col] = value }
+        rMaxMatrix = updated
+    }
+    
+    func setAllMaxRadius(value: Float = 0.120) {
+        self.rMaxMatrix = Array(repeating: value, count: numTypes * numTypes)
+    }
+    
+    /// ✨ 取得對應粒子種類的代表色（直接回傳當前動態色票陣列的顏色）
+    func colorForType(_ type: Int) -> Color {
+        guard !currentColors.isEmpty else { return .white }
+        return currentColors[type % currentColors.count]
+    }
 }

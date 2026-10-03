@@ -22,7 +22,7 @@ extension ParticleSimulator {
             prefixSumPipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "prefixSumGrid")!)
             reorderPipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "reorderParticles")!)
             computeGridPipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "computeGridParticles")!)
-            // ✨ 註冊 Mesh 更新管線
+            // 註冊 Mesh 更新管線
             updateMeshPipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "updateMeshVertices")!)
         } catch {
             fatalError("Pipeline 初始化失敗: \(error)")
@@ -32,12 +32,11 @@ extension ParticleSimulator {
     func setupBuffers() {
         var initialParticles = [Particle]()
         
-        // ✨ 修正 1：計算每種顏色的粒子數量，依序發放身分證，不使用 random
+        // 計算每種顏色的粒子數量，依序發放身分證，確保與 Mesh 顏色切塊完美對齊
         let particlesPerType = particleCount / numTypes
         
         for i in 0..<particleCount {
-            // 讓前 1/8 的粒子是 Type 0，接下來是 Type 1... 確保與 Mesh 顏色切塊完美對齊
-            let type = UInt32(i / particlesPerType)
+            let type = min(UInt32(numTypes - 1), UInt32(i / particlesPerType))
             
             let p = Particle(
                 position: SIMD3<Float>(
@@ -58,13 +57,17 @@ extension ParticleSimulator {
         particleBuffer = device.makeBuffer(bytes: initialParticles, length: bufferSize, options: .storageModeShared)
         sortedParticleBuffer = device.makeBuffer(length: bufferSize, options: .storageModePrivate)
         
+        // ✨ 初始化三組獨立的 N x N 矩陣 (Forces / Min. Radius / Max. Radius)
         let matrixSize = numTypes * numTypes
+        self.rMinMatrix = Array(repeating: 0.035, count: matrixSize)
+        self.rMaxMatrix = Array(repeating: 0.120, count: matrixSize)
         self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
+        updateRuleMatrixBuffer()
         
         paramsBuffer = device.makeBuffer(length: MemoryLayout<SimParams>.stride, options: .storageModeShared)
         updateParamsBuffer()
         
-        // 擴大為 32768 格
+        // 32^3 = 32768 格空間網格
         let gridBufferSize = 32768 * 16
         gridBuffer = device.makeBuffer(length: gridBufferSize, options: .storageModePrivate)
         
@@ -74,17 +77,16 @@ extension ParticleSimulator {
     func setupMesh() {
         var descriptor = LowLevelMesh.Descriptor()
         
-        // ✨ 修改：頂點與索引的容量降級為四面體 (4 頂點, 12 索引)
+        // 頂點與索引的容量為四面體 (4 頂點, 12 索引)
         descriptor.vertexCapacity = particleCount * 4
         descriptor.indexCapacity = particleCount * 12
         descriptor.indexType = .uint32
         
-        // 加入 Normal 屬性，並設定記憶體偏移量 (16 Bytes)
+        // 加入 Position 與 Normal 屬性 (偏移量 16 Bytes)
         descriptor.vertexAttributes = [
             LowLevelMesh.Attribute(semantic: .position, format: .float3, offset: 0),
             LowLevelMesh.Attribute(semantic: .normal, format: .float3, offset: 16)
         ]
-        // 每個頂點的資料總長度變為 32 Bytes (Position 16 + Normal 16)
         descriptor.vertexLayouts = [
             LowLevelMesh.Layout(bufferIndex: 0, bufferStride: 32)
         ]
@@ -92,8 +94,6 @@ extension ParticleSimulator {
         do {
             let mesh = try LowLevelMesh(descriptor: descriptor)
             let particlesPerType = particleCount / numTypes
-            
-            // ✨ 修改：每種顏色的索引數量變更為 12 (4 個面 x 3 個點)
             let indicesPerType = particlesPerType * 12
             
             let safeBounds = BoundingBox(
@@ -103,7 +103,6 @@ extension ParticleSimulator {
             
             mesh.parts.replaceAll((0..<numTypes).map { typeIndex in
                 LowLevelMesh.Part(
-                    // 乘上 4 (Bytes) 確保每種顏色的索引範圍不重疊
                     indexOffset: typeIndex * indicesPerType * MemoryLayout<UInt32>.stride,
                     indexCount: indicesPerType,
                     topology: .triangle,
@@ -117,24 +116,22 @@ extension ParticleSimulator {
             mesh.withUnsafeMutableIndices { rawIndices in
                 let typedIndices = rawIndices.bindMemory(to: UInt32.self)
                 for i in 0..<particleCount {
-                    // ✨ 修改：每個粒子只需偏移 4 個頂點與 12 個索引
                     let vOffset = UInt32(i * 4)
                     let iOffset = i * 12
                     
-                    // ✨ 建立四面體的 4 個面
-                    // 第 1 面
+                    // 建立四面體的 4 個面
                     typedIndices[iOffset + 0] = vOffset + 0
                     typedIndices[iOffset + 1] = vOffset + 1
                     typedIndices[iOffset + 2] = vOffset + 2
-                    // 第 2 面
+                    
                     typedIndices[iOffset + 3] = vOffset + 0
                     typedIndices[iOffset + 4] = vOffset + 3
                     typedIndices[iOffset + 5] = vOffset + 1
-                    // 第 3 面
+                    
                     typedIndices[iOffset + 6] = vOffset + 0
                     typedIndices[iOffset + 7] = vOffset + 2
                     typedIndices[iOffset + 8] = vOffset + 3
-                    // 第 4 面
+                    
                     typedIndices[iOffset + 9] = vOffset + 1
                     typedIndices[iOffset + 10] = vOffset + 3
                     typedIndices[iOffset + 11] = vOffset + 2
@@ -147,13 +144,30 @@ extension ParticleSimulator {
         }
     }
     
+    /// ✨ 將 Forces、rMin、rMax 三個矩陣連續打包進同一個 Buffer 傳給 GPU
     func updateRuleMatrixBuffer() {
-        let size = MemoryLayout<Float>.stride * ruleMatrix.count
-        ruleMatrixBuffer = device.makeBuffer(bytes: ruleMatrix, length: size, options: .storageModeShared)
+        guard device != nil else { return }
+        let matrixSize = numTypes * numTypes
+        guard ruleMatrix.count == matrixSize,
+              rMinMatrix.count == matrixSize,
+              rMaxMatrix.count == matrixSize else { return }
+        
+        let combined = ruleMatrix + rMinMatrix + rMaxMatrix
+        let byteSize = MemoryLayout<Float>.stride * combined.count
+        
+        if let buffer = ruleMatrixBuffer, buffer.length == byteSize {
+            let ptr = buffer.contents().bindMemory(to: Float.self, capacity: combined.count)
+            for i in 0..<combined.count {
+                ptr[i] = combined[i]
+            }
+        } else {
+            ruleMatrixBuffer = device.makeBuffer(bytes: combined, length: byteSize, options: .storageModeShared)
+        }
     }
     
     func updateParamsBuffer() {
-        let pointer = paramsBuffer.contents().bindMemory(to: SimParams.self, capacity: 1)
+        guard let buffer = paramsBuffer else { return }
+        let pointer = buffer.contents().bindMemory(to: SimParams.self, capacity: 1)
         pointer.pointee = params
     }
     
@@ -205,14 +219,18 @@ extension ParticleSimulator {
         computeEncoder.setBuffer(gridBuffer, offset: 0, index: 4)
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+        // ✨ 確保粒子座標寫入完畢後，再執行下方的頂點網格更新
+        computeEncoder.memoryBarrier(scope: .buffers)
         
-        // 更新 GPU 頂點網格
+        // 更新 GPU 頂點網格，並將 particleScale 傳入 buffer(3) 即時控制粒子視覺大小
         let currentVertexBuffer = mesh.replace(bufferIndex: 0, using: commandBuffer)
+        var currentScale = self.particleScale
         w = updateMeshPipeline.maxTotalThreadsPerThreadgroup
         computeEncoder.setComputePipelineState(updateMeshPipeline)
         computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
         computeEncoder.setBuffer(currentVertexBuffer, offset: 0, index: 1)
         computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 2)
+        computeEncoder.setBytes(&currentScale, length: MemoryLayout<Float>.stride, index: 3)
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
         

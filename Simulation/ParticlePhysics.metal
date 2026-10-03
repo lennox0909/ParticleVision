@@ -13,6 +13,9 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     Particle p = particlesIn[id];
     float3 force = float3(0.0);
     uint3 cellCoords = getCellCoords(p.position);
+    
+    // ✨ 計算單一矩陣的大小 (N x N)，用於偏移讀取 rMin 與 rMax 矩陣
+    uint matrixSize = params.numTypes * params.numTypes;
 
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
@@ -37,14 +40,19 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
                     float3 d = p.position - other.position;
                     float r = fast::length(d);
 
-                    if (r > 0.0 && r < params.rMax) {
+                    // ✨ 根據 (主動粒子 p.type -> 目標粒子 other.type) 查表取得專屬的引力、最小半徑與最大半徑
+                    uint ruleIdx = p.type * params.numTypes + other.type;
+                    float rule = ruleMatrix[ruleIdx];
+                    float pairRMin = ruleMatrix[matrixSize + ruleIdx];
+                    float pairRMax = max(pairRMin + 0.001f, ruleMatrix[matrixSize * 2 + ruleIdx]);
+
+                    if (r > 0.0 && r < pairRMax) {
                         d /= r;
 
-                        if (r < params.rMin) {
-                            force += d * (1.0f - r / params.rMin) * 2.0f;
+                        if (r < pairRMin) {
+                            force += d * (1.0f - r / pairRMin) * 2.0f;
                         } else {
-                            float rule = ruleMatrix[p.type * params.numTypes + other.type];
-                            float f = rule * (1.0f - abs(2.0f * r - params.rMax - params.rMin) / (params.rMax - params.rMin));
+                            float f = rule * (1.0f - abs(2.0f * r - pairRMax - pairRMin) / (pairRMax - pairRMin));
                             force += d * f;
                         }
                     }
@@ -53,12 +61,10 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
         }
     }
 
-    // --- 替換原本的 Jitter 程式碼 ---
-        
-    // 1. 動態種子：利用 id 與「當前速度」混合。速度每幀都在變化，確保擾動方向不斷切換，打破靜態風場
+    // 1. 動態種子：利用 id 與「當前速度」混合，確保擾動方向每幀切換，打破靜態風場
     uint seed = id ^ as_type<uint>(p.velocity.x) ^ as_type<uint>(p.velocity.y) ^ as_type<uint>(p.velocity.z);
     
-    // 2. 高品質整數雜湊 (PCG Hash 變體)：確保分佈絕對均勻，徹底消除特定方向的引力偏差
+    // 2. 高品質整數雜湊 (PCG Hash 變體)：確保分佈絕對均勻，消除特定方向的引力偏差
     seed ^= seed >> 16;
     seed *= 0x85ebca6b;
     seed ^= seed >> 13;
@@ -72,7 +78,7 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     
     float3 jitter = float3(rx, ry, rz);
     
-    // 4. 套用擾動 (因為現在的隨機性非常強且活躍，只需 0.1f 就足以打破網格對稱性)
+    // 4. 套用微小擾動打破網格對稱性
     force += jitter * 0.1f;
     
     p.velocity += force * params.dt;
@@ -120,17 +126,17 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
         p.velocity.z += (penetration / params.dt) * scoopForce;
     }
 
-    // 【核心修正】寫回原始身分證的記憶體位址，而非排序後的位址
+    // 寫回原始身分證的記憶體位址
     particlesOut[p.originalIndex] = p;
 }
 
-// 新增：包含位置與法線的頂點結構
+// 包含位置與法線的頂點結構
 struct ParticleVertex {
     float3 position;
     float3 normal;
 };
 
-// ✨ 修改：新增四面體的 4 個頂點 (已正規化處理，長度皆為 1，剛好可作為法線)
+// 四面體的 4 個正規化頂點
 constant float3 tetraVerts[4] = {
     float3( 1.0,  1.0,  1.0) * 0.57735f,
     float3( 1.0, -1.0, -1.0) * 0.57735f,
@@ -138,21 +144,19 @@ constant float3 tetraVerts[4] = {
     float3(-1.0, -1.0,  1.0) * 0.57735f
 };
 
-// 替換原有的 kernel，改為輸出 ParticleVertex
+// ✨ 接收 buffer(3) 傳入的 particleScale，讓粒子外觀大小滑桿獨立生效
 kernel void updateMeshVertices(device const Particle* particles [[buffer(0)]],
                                device ParticleVertex* vertices [[buffer(1)]],
                                constant SimParams& params [[buffer(2)]],
+                               constant float& particleScale [[buffer(3)]],
                                uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
     
     Particle p = particles[id];
-    
-    // ✨ 修改：每個粒子只佔用 4 個頂點的陣列空間
     uint vIndex = p.originalIndex * 4;
-    float size = 0.015;
+    float size = particleScale;
 
-    // ✨ 修改：迴圈降至 4 次
-    for(int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
         vertices[vIndex + i].position = p.position + tetraVerts[i] * size;
         vertices[vIndex + i].normal = tetraVerts[i];
     }
