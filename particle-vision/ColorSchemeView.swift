@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ColorSchemeView: View {
     @Environment(ParticleSimulator.self) private var simulator
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var showHelpPopover: Bool = false
     
     var body: some View {
@@ -19,7 +21,6 @@ struct ColorSchemeView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                // 點擊 ⓘ 彈出截圖中的 Static / Generative 說明
                 Button {
                     showHelpPopover.toggle()
                 } label: {
@@ -43,7 +44,6 @@ struct ColorSchemeView: View {
                 
                 Spacer()
                 
-                // 針對 Generative 色票，點擊可立即重新生成同主題的新變化
                 Button {
                     simulator.applyPalette(id: simulator.selectedPaletteID)
                 } label: {
@@ -54,7 +54,6 @@ struct ColorSchemeView: View {
                 .controlSize(.small)
                 .help("重新生成當前色票變化")
             }
-
             
             // MARK: - 2. 當前啟用的粒子色票預覽列
             VStack(alignment: .leading, spacing: 8) {
@@ -79,7 +78,7 @@ struct ColorSchemeView: View {
             
             Divider()
             
-            // MARK: - 3. 分類捲動色票選單 (Default / Static / Generative / Experimental)
+            // MARK: - 3. 分類捲動色票選單
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(ColorPaletteGenerator.categories, id: \.self) { category in
@@ -104,7 +103,6 @@ struct ColorSchemeView: View {
                                 let isSelected = (simulator.selectedPaletteID == option.id)
                                 
                                 Button {
-                                    // 點擊立即切換（若為 Generative 再次點擊也會產生新變體）
                                     simulator.applyPalette(id: option.id)
                                 } label: {
                                     HStack {
@@ -141,6 +139,18 @@ struct ColorSchemeView: View {
             }
         }
         .padding(35)
+        // ✨ 當使用者按視窗底部的系統「✕」關閉時，自動將主控制台的按鈕跳回未選取狀態
+        .onAppear {
+            // ✨ 防呆機制：如果是系統重開 App 時誤把子視窗叫出來（此時按鈕狀態為 false），
+            // 則立即關閉自己，並強制喚醒主控制台視窗！
+            if !simulator.showColorWindow {
+                openWindow(id: "MainControlWindow")
+                dismissWindow(id: "ColorSchemeWindow")
+            }
+        }
+        .onDisappear {
+            simulator.showColorWindow = false
+        }
     }
     
     private var currentPaletteName: String {

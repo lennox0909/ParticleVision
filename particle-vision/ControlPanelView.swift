@@ -6,7 +6,6 @@ struct ControlPanelView: View {
     @State private var particleCount: Double = 50000
     @State private var numTypes: Double = 6
     
-    // 檢查使用者是否調整了數量或種類但尚未點擊套用
     private var hasPendingChanges: Bool {
         Int(particleCount) != simulator.particleCount || Int(numTypes) != simulator.numTypes
     }
@@ -14,10 +13,10 @@ struct ControlPanelView: View {
     var body: some View {
         @Bindable var bindableSimulator = simulator
         
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             
             // MARK: - 區塊 1：宇宙規模設定（需點擊重置套用）
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Label("宇宙規模設定", systemImage: "cube.transparent")
                         .font(.caption.weight(.bold))
@@ -31,7 +30,7 @@ struct ControlPanelView: View {
                 }
                 
                 // 1. 粒子數量
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("粒子數量")
                             .font(.subheadline.weight(.medium))
@@ -44,7 +43,7 @@ struct ControlPanelView: View {
                 }
                 
                 // 2. 粒子種類
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("粒子種類")
                             .font(.subheadline.weight(.medium))
@@ -71,12 +70,13 @@ struct ControlPanelView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(hasPendingChanges ? .orange : .white.opacity(0.22))
                 .controlSize(.regular)
+                .padding(.top, 2)
             }
-            .padding(16)
+            .padding(14)
             .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
             
             // MARK: - 區塊 2：即時物理與視覺微調（拉動立即生效）
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Label("即時物理與視覺", systemImage: "slider.horizontal.3")
                         .font(.caption.weight(.bold))
@@ -88,7 +88,7 @@ struct ControlPanelView: View {
                 }
                 
                 // 3. 粒子大小
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("粒子大小")
                             .font(.subheadline.weight(.medium))
@@ -101,7 +101,7 @@ struct ControlPanelView: View {
                 }
                 
                 // 4. 空間摩擦力
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("空間摩擦力")
                             .font(.subheadline.weight(.medium))
@@ -114,7 +114,7 @@ struct ControlPanelView: View {
                 }
                 
                 // 5. 螢光強度
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("螢光強度")
                             .font(.subheadline.weight(.medium))
@@ -148,7 +148,7 @@ struct ControlPanelView: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(14)
             .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
         }
         .onAppear {

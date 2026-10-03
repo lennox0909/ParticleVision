@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RuleMatrixView: View {
     @Environment(ParticleSimulator.self) private var simulator
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     
     enum MatrixTab: String, CaseIterable {
         case forces = "Forces"
@@ -45,7 +47,7 @@ struct RuleMatrixView: View {
         
         VStack(alignment: .leading, spacing: 18) {
             
-            // MARK: - 1. 標題列與「隨機引力規則」、「全部歸零」按鈕
+            // MARK: - 1. 標題列與「隨機引力規則」、「全部歸零 / 重置半徑」按鈕
             HStack(spacing: 10) {
                 Image(systemName: "grid")
                     .font(.title2)
@@ -58,7 +60,6 @@ struct RuleMatrixView: View {
                 
                 Spacer()
                 
-                // ✨ 移過來的「隨機引力規則」按鈕（位於全部歸零左邊）
                 Button("隨機引力規則") {
                     simulator.randomizeRules()
                 }
@@ -136,6 +137,7 @@ struct RuleMatrixView: View {
             }
             .padding(4)
             .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+            
             // MARK: - 3. 2D 互動式矩陣網格 (Heat Map Grid)
             VStack(spacing: 4) {
                 HStack(spacing: 4) {
@@ -214,15 +216,15 @@ struct RuleMatrixView: View {
             
             Spacer(minLength: 0)
             
-            // MARK: - 4. 底部控制列
-            HStack(spacing: 14) {
+            // MARK: - 4. 底部控制列 (包含滑桿與 － / ＋ 精準微調按鈕)
+            HStack(spacing: 10) {
                 Button {
                     selection = .all
                 } label: {
                     Text(selectionTitle)
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .frame(width: 105)
+                        .frame(width: 90)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
@@ -242,10 +244,30 @@ struct RuleMatrixView: View {
                 )
                 .tint(sliderTintColor)
                 
+                // ✨ 減少按鈕 (Forces: -0.01 / Min & Max Radius: -1)
+                Button {
+                    adjustSliderValue(by: -sliderStep)
+                } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
+                
+                // ✨ 增加按鈕 (Forces: +0.01 / Min & Max Radius: +1)
+                Button {
+                    adjustSliderValue(by: sliderStep)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
+                
                 Text(formattedSliderValue)
                     .font(.system(.subheadline, design: .monospaced).bold())
                     .foregroundStyle(.black)
-                    .frame(width: 64)
+                    .frame(width: 60)
                     .padding(.vertical, 6)
                     .background(Color.white, in: RoundedRectangle(cornerRadius: 6))
             }
@@ -263,9 +285,30 @@ struct RuleMatrixView: View {
                 break
             }
         }
+        .onAppear {
+            if !simulator.showMatrixWindow {
+                openWindow(id: "MainControlWindow")
+                dismissWindow(id: "MatrixSettingsWindow")
+            }
+        }
+        .onDisappear {
+            simulator.showMatrixWindow = false
+        }
     }
     
     // MARK: - 視覺與邏輯輔助計算
+    
+    /// ✨ 處理 － / ＋ 按鈕點擊時的數值增減與邊界限制，並消除浮點數誤差
+    private func adjustSliderValue(by delta: Double) {
+        let current = activeSliderBinding.wrappedValue
+        let next = min(sliderRange.upperBound, max(sliderRange.lowerBound, current + delta))
+        
+        if selectedTab == .forces {
+            activeSliderBinding.wrappedValue = (next * 100.0).rounded() / 100.0
+        } else {
+            activeSliderBinding.wrappedValue = next.rounded()
+        }
+    }
     
     private func isCellHighlighted(row: Int, col: Int) -> Bool {
         switch selection {
@@ -281,9 +324,9 @@ struct RuleMatrixView: View {
         case .forces:
             let val = Double(simulator.getRule(from: row, to: col))
             let intensity = min(1.0, abs(val))
-            if val > 0.01 {
+            if val > 0.005 {
                 return Color(red: 0.02, green: 0.12 + 0.58 * intensity, blue: 0.16 + 0.68 * intensity)
-            } else if val < -0.01 {
+            } else if val < -0.005 {
                 return Color(red: 0.15 + 0.72 * intensity, green: 0.04, blue: 0.08)
             } else {
                 return Color(red: 0.06, green: 0.08, blue: 0.10)
@@ -370,9 +413,10 @@ struct RuleMatrixView: View {
         }
     }
     
+    /// ✨ Forces 每步 0.01；Min. Radius 與 Max. Radius 每步 1.0
     private var sliderStep: Double {
         switch selectedTab {
-        case .forces: return 0.05
+        case .forces: return 0.01
         case .minRadius, .maxRadius: return 1.0
         }
     }
