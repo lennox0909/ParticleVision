@@ -5,10 +5,11 @@ struct ControlPanelView: View {
     
     @State private var particleCount: Double = 100000
     @State private var numTypes: Double = 6
-    @State private var particleScale: Double = 0.015
-    @State private var friction: Double = 0.95
     
     var body: some View {
+        // ✨ 將 @Bindable 提升至頂部，讓粒子大小、空間摩擦力與螢光強度皆能零延遲直接雙向綁定
+        @Bindable var bindableSimulator = simulator
+        
         VStack(spacing: 20) {
             
             // FPS 顯示面板
@@ -34,25 +35,20 @@ struct ControlPanelView: View {
                 Slider(value: $numTypes, in: 2...8, step: 1)
             }
             
+            // ✨ 直接綁定 $bindableSimulator.particleScale，拉動瞬間立即改變 3D 顆粒大小
             VStack(alignment: .leading) {
-                Text("粒子大小: \(String(format: "%.3f", particleScale))")
+                Text("粒子大小: \(String(format: "%.3f", simulator.particleScale))")
                     .font(.headline)
-                Slider(value: $particleScale, in: 0.005...0.05, step: 0.001)
-                    .onChange(of: particleScale) { _, newValue in
-                        simulator.particleScale = Float(newValue)
-                    }
+                Slider(value: $bindableSimulator.particleScale, in: 0.005...0.050, step: 0.001)
             }
             
+            // ✨ 直接綁定 $bindableSimulator.friction，即時同步空間摩擦力
             VStack(alignment: .leading) {
-                Text("空間摩擦力: \(String(format: "%.2f", friction))")
+                Text("空間摩擦力: \(String(format: "%.2f", simulator.friction))")
                     .font(.headline)
-                Slider(value: $friction, in: 0.01...0.99, step: 0.05)
-                    .onChange(of: friction) { _, newValue in
-                        simulator.friction = Float(newValue)
-                    }
+                Slider(value: $bindableSimulator.friction, in: 0.01...0.99, step: 0.01)
             }
             
-            @Bindable var bindableSimulator = simulator
             VStack(alignment: .leading) {
                 Text("螢光強度: \(String(format: "%.1f", simulator.glowIntensity))")
                     .font(.headline)
@@ -80,11 +76,6 @@ struct ControlPanelView: View {
             }
             
             HStack(spacing: 20) {
-                Button("隨機引力規則") {
-                    simulator.randomizeRules()
-                }
-                .buttonStyle(.bordered)
-                
                 Button("套用並重置宇宙") {
                     simulator.resetSimulation(newCount: Int(particleCount), newTypes: Int(numTypes))
                 }
@@ -92,6 +83,10 @@ struct ControlPanelView: View {
             }
             .padding(.top, 10)
         }
-        // ✨ 已移除這裡的 padding、frame 與 glassBackgroundEffect，交給外層處理
+        .onAppear {
+            // 確保面板開啟時，滑桿顯示的初始數量與種類和模擬器實際狀態一致
+            particleCount = Double(simulator.particleCount)
+            numTypes = Double(simulator.numTypes)
+        }
     }
 }

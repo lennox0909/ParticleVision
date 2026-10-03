@@ -27,24 +27,24 @@ struct ImmersiveView: View {
         RealityView { content in
             let boxSize: Float = 4.0
             
-            // ✨ 改用 Entity+Extensions 提供的優雅語法
+            // 改用 Entity+Extensions 提供的優雅語法
             containerBox.addBoxEdges(size: boxSize)
             
-            // ✨ 讀取儲存的縮放比例，若無則使用預設值
+            // 讀取儲存的縮放比例，若無則使用預設值
             if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
                 containerBox.scale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
             } else {
                 containerBox.scale = SIMD3<Float>(repeating: 0.1)
             }
             
-            // ✨ 讀取儲存的空間位置，若無則使用預設值
+            // 讀取儲存的空間位置，若無則使用預設值
             if let savedPos = UserDefaults.standard.array(forKey: "BoxPosition") as? [Float], savedPos.count == 3 {
                 containerBox.position = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
             } else {
                 containerBox.position = SIMD3<Float>(0.4, 1.1, -0.7)
             }
             
-            // ✨ 替換原本的單一實心碰撞體，改為 12 根邊框專用的碰撞條
+            // 替換原本的單一實心碰撞體，改為 12 根邊框專用的碰撞條
             let s = boxSize
             let t: Float = 0.2 // 給予邊框 20 公分的「隱形判定厚度」，讓眼睛隨便看都能輕鬆命中
             let h = s / 2
@@ -76,13 +76,13 @@ struct ImmersiveView: View {
             let subscription = content.subscribe(to: SceneEvents.Update.self) { _ in
                 guard !self.particleEntities.isEmpty else { return }
                 
-                // ✨ 新增：觸發 FPS 計算
+                // 觸發 FPS 計算
                 simulator.updateFPS()
                 
                 // 1. 呼叫 ImmersiveView+HandTracking 裡的擴充方法
                 updateBoxWithHandTracking()
                 
-                // 2. 執行 GPU 運算
+                // 2. 執行 GPU 運算 (內部已自動透過 updateMeshVertices 即時縮放單顆粒子大小)
                 simulator.updateSimulation()
                 
                 // 3. 呼叫 ImmersiveView+Particles 裡的擴充方法同步視覺
@@ -93,7 +93,6 @@ struct ImmersiveView: View {
                 self.frameSubscription = subscription
                 do {
                     let usdaTemplate = try await Entity(named: "Sphere")
-                    // ✨ 改用 Entity+Extensions 提供的優雅語法
                     self.coreTemplate = usdaTemplate.findModelEntity()
                     
                     if self.coreTemplate != nil {
@@ -116,12 +115,8 @@ struct ImmersiveView: View {
                 print("ARKit 手部追蹤啟動失敗：\(error)")
             }
         }
-        .onChange(of: simulator.particleScale) { _, newScale in
-            let newScaleVector = SIMD3<Float>(repeating: newScale)
-            for entity in particleEntities {
-                entity.scale = newScaleVector
-            }
-        }
+        // ✨ 已移除原本會把整個宇宙 Entity 縮小的 .onChange(of: simulator.particleScale)
+        // 現在單顆粒子大小完全由 Metal 的 updateMeshVertices 控制，並自動隨 containerBox 等比例縮放！
         .onChange(of: simulator.needsVisualRebuild) { _, needsRebuild in
             if needsRebuild {
                 for entity in particleEntities {
@@ -132,7 +127,7 @@ struct ImmersiveView: View {
                 simulator.needsVisualRebuild = false
             }
         }
-        // ✨ 新增：監聽螢光開關，一旦切換就呼叫剛剛寫好的材質更新函式
+        // 監聽螢光開關，一旦切換就呼叫材質更新函式
         .onChange(of: simulator.glowIntensity) { _, _ in
             updateParticleMaterials()
         }
@@ -140,7 +135,6 @@ struct ImmersiveView: View {
             frameSubscription?.cancel()
             frameSubscription = nil
         }
-        // ✨ 使用我們抽離出來的手勢 ViewModifier，讓主視圖極度清爽
         .containerDragGesture(
             isScaling: $isScaling,
             activeHand: $activeHand,
