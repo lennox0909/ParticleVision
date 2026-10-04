@@ -19,6 +19,18 @@ class ParticleSimulator {
     // 是否允許手部對透明盒子進行拖曳、旋轉或縮放操作
     var isBoxInteractionEnabled: Bool = true
     
+    // ✨ 新增：空間時間控制 (暫停凍結 & 0.1x 慢動作 ~ 2.0x 倍速演化)
+    var isPaused: Bool = false
+    var timeScale: Float = 1.0 {
+        didSet {
+            params.dt = 0.016 * timeScale
+            updateParamsBuffer()
+        }
+    }
+    
+    // ✨ 新增：宇宙邊界物理模式 (false = 📦 彈性撈網邊界 Bounce, true = ♾️ 無縫週期穿越 Wrap-around)
+    var isWrapBoundary: Bool = false
+    
     // ✨ 左右手「神之手」力場資料 [左手, 右手]（加上 @ObservationIgnored 避免每幀觸發 UI 重繪與巨集歧義）
     @ObservationIgnored
     var handForces: [SIMD4<Float>] = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
@@ -192,6 +204,7 @@ class ParticleSimulator {
         self.params.particleCount = UInt32(newCount)
         self.params.numTypes = UInt32(newTypes)
         self.params.friction = self.friction
+        self.params.dt = 0.016 * self.timeScale // ✨ 保持當前時間流速倍率
         
         // ✨ 當粒子種類數改變時，根據當前選中的色票重新生成對應數量的顏色
         self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: newTypes)

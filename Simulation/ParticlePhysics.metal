@@ -8,6 +8,7 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
                                  constant SimParams& params [[buffer(3)]],
                                  device const Cell* grid [[buffer(4)]],
                                  constant float4* handForces [[buffer(5)]],
+                                 constant uint& boundaryMode [[buffer(6)]],
                                  uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
 
@@ -23,10 +24,15 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
             for (int x = -1; x <= 1; x++) {
                 int3 neighborCoords = int3(cellCoords) + int3(x, y, z);
 
-                if (neighborCoords.x < 0 || neighborCoords.x > 31 ||
-                    neighborCoords.y < 0 || neighborCoords.y > 31 ||
-                    neighborCoords.z < 0 || neighborCoords.z > 31) {
-                    continue;
+                if (boundaryMode == 1) {
+                    // ♾️ 無縫環形宇宙模式：網格索引在 0 ~ 31 之間循環折返 (Modulo 32)
+                    neighborCoords = (neighborCoords + 32) & 31;
+                } else {
+                    if (neighborCoords.x < 0 || neighborCoords.x > 31 ||
+                        neighborCoords.y < 0 || neighborCoords.y > 31 ||
+                        neighborCoords.z < 0 || neighborCoords.z > 31) {
+                        continue;
+                    }
                 }
 
                 uint neighborCellIndex = getCellIndex(uint3(neighborCoords));
@@ -39,6 +45,14 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
 
                     Particle other = particlesIn[otherId];
                     float3 d = p.position - other.position;
+                    
+                    // ♾️ 若為無縫環形邊界，跨牆壁的兩顆粒子取最短環形距離 (盒寬 = 4.0)
+                    if (boundaryMode == 1) {
+                        if (d.x >  2.0f) d.x -= 4.0f; else if (d.x < -2.0f) d.x += 4.0f;
+                        if (d.y >  2.0f) d.y -= 4.0f; else if (d.y < -2.0f) d.y += 4.0f;
+                        if (d.z >  2.0f) d.z -= 4.0f; else if (d.z < -2.0f) d.z += 4.0f;
+                    }
+                    
                     float r = fast::length(d);
 
                     // ✨ 根據 (主動粒子 p.type -> 目標粒子 other.type) 查表取得專屬的引力、最小半徑與最大半徑
@@ -82,7 +96,7 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     // 4. 套用微小擾動打破網格對稱性
     force += jitter * 0.1f;
 
-    // 5. ✨ 雙手「神之手」粒子力場互動 (0: 左手, 1: 右手)
+    // 5. 雙手「神之手」粒子力場互動 (0: 左手, 1: 右手)
     for (int h = 0; h < 2; h++) {
         float mode = handForces[h].w;
         if (abs(mode) > 0.01f) {
@@ -90,25 +104,20 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
             float3 toHand = handPos - p.position;
             float dist = fast::length(toHand);
             
-            // 作用範圍：局部座標半徑 1.25 內（涵蓋約三分之一個盒子的廣域力場）
             float influenceRadius = 1.25f;
             if (dist > 0.001f && dist < influenceRadius) {
                 float3 dir = toHand / dist;
                 float falloff = 1.0f - (dist / influenceRadius);
                 
                 if (mode > 0.0f) {
-                    // ✋ 張開手模式 (+1.0)：星雲漩渦引力場
-                    // 距離 < 0.12 時產生微排斥核心，避免所有粒子重疊縮成單一亮點；外圍則強力吸引並加上水平切線旋轉力
                     if (dist < 0.12f) {
                         force -= dir * (1.0f - dist / 0.12f) * 8.0f;
                     } else {
                         force += dir * (falloff * falloff) * 14.0f;
-                        // 切線軌道旋力：讓聚集過來的粒子繞著指尖優雅公轉
                         float3 swirlDir = normalize(cross(dir, float3(0.0f, 1.0f, 0.0f)) + float3(0.001f));
                         force += swirlDir * falloff * 5.5f;
                     }
                 } else {
-                    // 🤏 捏合手指模式 (-1.0)：超新星斥力衝擊波
                     force -= dir * (falloff * falloff) * 32.0f;
                 }
             }
@@ -116,48 +125,66 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     }
     
     p.velocity += force * params.dt;
-    p.velocity *= params.friction;
+    // ✨ 根據時間流速倍率動態補償摩擦阻尼，確保 0.1x 超慢動作時粒子不會因為每步乘上固定摩擦係數而提早失速
+    float timeScaleRatio = clamp(params.dt / 0.016f, 0.05f, 2.5f);
+    p.velocity *= pow(params.friction, timeScaleRatio);
     p.position += p.velocity * params.dt;
 
-    // 撈魚網物理邊界
-    float bounds = 2.0;
-    float bounce = 0.4;
-    float scoopForce = 0.8;
+    float bounds = 2.0f;
+    float boxSpan = 4.0f;
 
-    if (p.position.x > bounds) {
-        float penetration = p.position.x - bounds;
-        p.position.x = bounds;
-        if (p.velocity.x > 0) p.velocity.x *= -bounce;
-        p.velocity.x -= (penetration / params.dt) * scoopForce;
-    } else if (p.position.x < -bounds) {
-        float penetration = -bounds - p.position.x;
-        p.position.x = -bounds;
-        if (p.velocity.x < 0) p.velocity.x *= -bounce;
-        p.velocity.x += (penetration / params.dt) * scoopForce;
-    }
+    if (boundaryMode == 1) {
+        // ♾️️ 模式 1：無縫週期性穿越邊界 (Wrap-around Toroidal Space)
+        // 從左牆 (-2.0) 穿出直接從右牆 (+2.0) 進入，完全無牆壁阻擋
+        if (p.position.x >  bounds) p.position.x -= boxSpan;
+        else if (p.position.x < -bounds) p.position.x += boxSpan;
 
-    if (p.position.y > bounds) {
-        float penetration = p.position.y - bounds;
-        p.position.y = bounds;
-        if (p.velocity.y > 0) p.velocity.y *= -bounce;
-        p.velocity.y -= (penetration / params.dt) * scoopForce;
-    } else if (p.position.y < -bounds) {
-        float penetration = -bounds - p.position.y;
-        p.position.y = -bounds;
-        if (p.velocity.y < 0) p.velocity.y *= -bounce;
-        p.velocity.y += (penetration / params.dt) * scoopForce;
-    }
+        if (p.position.y >  bounds) p.position.y -= boxSpan;
+        else if (p.position.y < -bounds) p.position.y += boxSpan;
 
-    if (p.position.z > bounds) {
-        float penetration = p.position.z - bounds;
-        p.position.z = bounds;
-        if (p.velocity.z > 0) p.velocity.z *= -bounce;
-        p.velocity.z -= (penetration / params.dt) * scoopForce;
-    } else if (p.position.z < -bounds) {
-        float penetration = -bounds - p.position.z;
-        p.position.z = -bounds;
-        if (p.velocity.z < 0) p.velocity.z *= -bounce;
-        p.velocity.z += (penetration / params.dt) * scoopForce;
+        if (p.position.z >  bounds) p.position.z -= boxSpan;
+        else if (p.position.z < -bounds) p.position.z += boxSpan;
+    } else {
+        // 📦 模式 0：彈性撈魚網物理邊界 (Bounce & Scoop)
+        float bounce = 0.4f;
+        float scoopForce = 0.8f;
+        float safeDt = max(params.dt, 0.0016f);
+
+        if (p.position.x > bounds) {
+            float penetration = p.position.x - bounds;
+            p.position.x = bounds;
+            if (p.velocity.x > 0) p.velocity.x *= -bounce;
+            p.velocity.x -= (penetration / safeDt) * scoopForce;
+        } else if (p.position.x < -bounds) {
+            float penetration = -bounds - p.position.x;
+            p.position.x = -bounds;
+            if (p.velocity.x < 0) p.velocity.x *= -bounce;
+            p.velocity.x += (penetration / safeDt) * scoopForce;
+        }
+
+        if (p.position.y > bounds) {
+            float penetration = p.position.y - bounds;
+            p.position.y = bounds;
+            if (p.velocity.y > 0) p.velocity.y *= -bounce;
+            p.velocity.y -= (penetration / safeDt) * scoopForce;
+        } else if (p.position.y < -bounds) {
+            float penetration = -bounds - p.position.y;
+            p.position.y = -bounds;
+            if (p.velocity.y < 0) p.velocity.y *= -bounce;
+            p.velocity.y += (penetration / safeDt) * scoopForce;
+        }
+
+        if (p.position.z > bounds) {
+            float penetration = p.position.z - bounds;
+            p.position.z = bounds;
+            if (p.velocity.z > 0) p.velocity.z *= -bounce;
+            p.velocity.z -= (penetration / safeDt) * scoopForce;
+        } else if (p.position.z < -bounds) {
+            float penetration = -bounds - p.position.z;
+            p.position.z = -bounds;
+            if (p.velocity.z < 0) p.velocity.z *= -bounce;
+            p.velocity.z += (penetration / safeDt) * scoopForce;
+        }
     }
 
     // 寫回原始身分證的記憶體位址

@@ -9,17 +9,16 @@ struct ContentView: View {
     var body: some View {
         @Bindable var bindableSim = simulator
         
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             
-            // MARK: - 頂部標題列 + FPS 狀態膠囊
+            // MARK: - 1. 頂部標題列 + FPS 狀態膠囊
             HStack(alignment: .center) {
                 Image(systemName: "sparkles")
-                    .font(.title2)
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(.cyan)
                 
                 Text("Particle Life 控制台")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title3.weight(.bold))
                 
                 Spacer()
                 
@@ -27,29 +26,31 @@ struct ContentView: View {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(fpsStatusColor)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 7, height: 7)
                     Text("FPS \(simulator.currentFPS)")
-                        .font(.system(.caption, design: .monospaced).bold())
+                        .font(.system(.caption2, design: .monospaced).bold())
                         .foregroundStyle(.primary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.black.opacity(0.3), in: Capsule())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.black.opacity(0.35), in: Capsule())
                 .overlay(
                     Capsule().stroke(fpsStatusColor.opacity(0.5), lineWidth: 1)
                 )
             }
+            .padding(.top, 2)
             
-            // MARK: - 獨立視窗開啟 / 關閉切換按鈕
-            HStack(spacing: 12) {
+            // MARK: - 2. 獨立視窗開啟 / 關閉 + 手部互動模式控制列
+            HStack(spacing: 8) {
                 Toggle(isOn: $bindableSim.showColorWindow) {
                     Label("Color Scheme", systemImage: "paintpalette.fill")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 3)
                 }
                 .toggleStyle(.button)
                 .tint(.cyan)
+                .controlSize(.small)
                 .onChange(of: simulator.showColorWindow) { _, shouldOpen in
                     if shouldOpen {
                         openWindow(id: "ColorSchemeWindow")
@@ -60,12 +61,13 @@ struct ContentView: View {
                 
                 Toggle(isOn: $bindableSim.showMatrixWindow) {
                     Label("Matrix Settings", systemImage: "grid")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 3)
                 }
                 .toggleStyle(.button)
                 .tint(.cyan)
+                .controlSize(.small)
                 .onChange(of: simulator.showMatrixWindow) { _, shouldOpen in
                     if shouldOpen {
                         openWindow(id: "MatrixSettingsWindow")
@@ -75,36 +77,60 @@ struct ContentView: View {
                 }
             }
             
-            // MARK: - 透明盒子手部操作防誤觸開關
-            Toggle(isOn: $bindableSim.isBoxInteractionEnabled) {
+            // MARK: - 3. 透明盒子手部操作 vs 神之手力場切換橫幅（告別刺眼全白按鈕）
+            Button {
+                simulator.isBoxInteractionEnabled.toggle()
+            } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: simulator.isBoxInteractionEnabled ? "hand.draw.fill" : "lock.fill")
-                        .font(.subheadline)
-                    Text(simulator.isBoxInteractionEnabled ? "允許手部操作透明盒子" : "已鎖定透明盒子 (防誤觸觀察模式)")
+                    Image(systemName: simulator.isBoxInteractionEnabled ? "hand.draw.fill" : "wand.and.stars")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(simulator.isBoxInteractionEnabled ? .cyan : .orange)
+                    
+                    Text(simulator.isBoxInteractionEnabled ? "手勢模式：允許搬移與縮放透明盒子" : "手勢模式：已鎖定盒子 (雙手神之手力場啟用中)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    Text(simulator.isBoxInteractionEnabled ? "點擊鎖定 🔒" : "點擊解鎖 🖐️")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            (simulator.isBoxInteractionEnabled ? Color.cyan : Color.orange).opacity(0.22),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(simulator.isBoxInteractionEnabled ? .cyan : .orange)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.28))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke((simulator.isBoxInteractionEnabled ? Color.cyan : Color.orange).opacity(0.45), lineWidth: 1)
+                        )
+                )
             }
-            .toggleStyle(.button)
-            .tint(simulator.isBoxInteractionEnabled ? .cyan : .orange)
+            .buttonStyle(.plain)
             
-            // MARK: - 核心參數控制面板（宇宙規模設定）
+            // MARK: - 4. 核心參數控制面板（宇宙規模 / 時空邊界 / 透明盒子外觀）
             ControlPanelView()
             
             Spacer(minLength: 0)
             
-            // MARK: - 底部 3D 空間啟動鈕（置中）
+            // MARK: - 5. 底部 3D 空間啟動鈕（置中並保留底部呼吸空間）
             HStack {
                 Spacer()
                 ToggleImmersiveSpaceButton()
+                    .controlSize(.regular)
                 Spacer()
             }
-            .padding(.top, 2)
+            .padding(.bottom, 2)
         }
-        .padding(28)
-        // ✨ 配合移除下半部卡片，將 minHeight 由 780 下調至 460，消除底部多餘空白
-        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .onDisappear {
             if simulator.showColorWindow {
                 dismissWindow(id: "ColorSchemeWindow")
