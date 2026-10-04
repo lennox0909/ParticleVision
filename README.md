@@ -4,6 +4,7 @@
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange?logo=swift)](https://swift.org)
 [![Metal](https://img.shields.io/badge/GPGPU-Metal%20Compute-purple?logo=apple)](https://developer.apple.com/metal/)
 [![Framework](https://img.shields.io/badge/Framework-RealityKit%20%7C%20ARKit%20%7C%20SwiftUI-blue)](https://developer.apple.com/augmented-reality/realitykit/)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
 **Particle Vision (`particle-vision`)** 是一套專為 **Apple Vision Pro (visionOS)** 打造的高效能 3D 空間人工生命（Artificial Life）與天體物理力場模擬器。
 
