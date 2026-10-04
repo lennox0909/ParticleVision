@@ -110,93 +110,182 @@ flowchart TB
     class Input_Tier,Simulator_Core subStyle
 ```
 
+
+```mermaid
+---
+title: "粒子模擬器系統核心主架構 (Particle Simulator System Overview)"
+config:
+  theme: base
+  themeVariables:
+    clusterBkg: "#F5F5F7"
+    clusterBorder: "#86868B"
+    titleColor: "#1D1D1F"
+    primaryTextColor: "#1D1D1F"
+    lineColor: "#424245"
+  flowchart:
+    curve: basis
+    nodeSpacing: 65
+    rankSpacing: 80
+    padding: 32
+---
+flowchart TB
+    %% 🍎 Apple HIG 高反差系統色票 (深色字體配高明度微霧面底色，確保絕對清晰)
+    classDef appleBlue fill:#E5F1FF,stroke:#0071E3,stroke-width:2px,color:#002B5B
+    classDef appleGreen fill:#E3F9E9,stroke:#28CD41,stroke-width:2px,color:#0A4D16
+    classDef appleOrange fill:#FFF0E0,stroke:#FF9500,stroke-width:2px,color:#6E3200
+    classDef applePurple fill:#F4E6FC,stroke:#AF52DE,stroke-width:2px,color:#4A126B
+    classDef appleIndigo fill:#EAEAFE,stroke:#5856D6,stroke-width:2px,color:#1F1D6B
+    classDef applePill fill:#FFFFFF,stroke:#6E6E73,stroke-width:1.5px,stroke-dasharray: 4 4,color:#1D1D1F
+
+    %% 頂層輸入模組 (單行緊湊粗體標題，避免與內部節點頂部重疊)
+    subgraph Input_Tier ["<b>📥 互動與控制輸入層 (Interaction & Control)</b>"]
+        SwiftUI_Mod("🖥️ SwiftUI 模組化控制台<br/>(Modular UI<br/>Consoles)"):::appleBlue
+        ARKit_Mod("🖐️️ ARKit 空間與聲學引擎<br/>(Spatial & Audio<br/>Engine)"):::appleGreen
+    end
+
+    %% 核心狀態機子圖
+    subgraph Simulator_Core ["<b>🧠 核心狀態機 (Simulator Core)</b>"]
+        SimState[("共享記憶體緩衝區<br/>(Shared UMA<br/>Buffers)")]:::appleOrange
+        KineticSampler("動能即時抽樣器<br/>(Live Kinetic<br/>Energy Sampler)"):::appleOrange
+    end
+
+    %% 獨立抽離之 GPGPU 模組節點
+    Metal_Mod[["⚡ Metal 6階段運算管線<br/>(Metal 6-Stage<br/>GPGPU Pipeline)<br/>🔍 詳見子圖 A"]]:::applePurple
+
+    %% 中間轉換動作節點 (保持連線淨空、消除反向拉扯)
+    AudioSync(["聲學狀態同步<br/>(Audio State<br/>Sync)"]):::applePill
+    ZeroCopy(["UMA 零拷貝抽樣<br/>(UMA Zero-Copy<br/>Sampling)"]):::applePill
+    VertexWrite(["四面體頂點直寫<br/>(Direct Vertex<br/>Buffer Write)"]):::applePill
+
+    %% 底層渲染模組
+    RealityKit_Mod[["🥽 RealityKit 3D 沉浸空間<br/>(3D Immersive<br/>Render Space)<br/>🔍 詳見子圖 B"]]:::appleIndigo
+
+    %% 系統主幹資料流
+    SwiftUI_Mod ==> SimState
+    ARKit_Mod ==> SimState
+
+    SimState -.-> AudioSync
+    SimState ==> Metal_Mod
+
+    Metal_Mod -.-> ZeroCopy -.-> KineticSampler
+    Metal_Mod ==> VertexWrite ==> RealityKit_Mod
+
+    ARKit_Mod --> RealityKit_Mod
+    KineticSampler --> RealityKit_Mod
+
+    %% 強制指定子圖容器為 Apple 淺灰底色 (#F5F5F7) 與純黑高反差字體 (#1D1D1F)
+    style Input_Tier fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
+    style Simulator_Core fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
+```
+
+
 ```mermaid
 ---
 title: "子圖 A - Metal 6階段平行運算管線 (Sub-diagram A - Metal 6-Stage GPGPU Pipeline)"
 config:
+  theme: base
+  themeVariables:
+    clusterBkg: "#F5F5F7"
+    clusterBorder: "#86868B"
+    titleColor: "#1D1D1F"
+    primaryTextColor: "#1D1D1F"
+    lineColor: "#424245"
   flowchart:
-    nodeSpacing: 50
-    rankSpacing: 60
-    padding: 20
+    curve: basis
+    nodeSpacing: 55
+    rankSpacing: 70
+    padding: 28
 ---
 flowchart TB
-    classDef passStyle fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#4A148C
-    classDef ioStyle fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#263238
-    classDef subStyle fill:#263238,stroke:#90A4AE,stroke-width:1.5px,color:#FFFFFF
+    %% 🍎 Apple HIG 高反差系統色票
+    classDef applePurple fill:#F4E6FC,stroke:#AF52DE,stroke-width:2px,color:#4A126B
+    classDef appleIndigo fill:#EAEAFE,stroke:#5856D6,stroke-width:2px,color:#1F1D6B
+    classDef applePill fill:#FFFFFF,stroke:#6E6E73,stroke-width:2px,color:#1D1D1F
 
-    UMA_In(["📥 接收 UMA 共享緩衝區<br/>(Input Shared<br/>UMA Buffers)"]):::ioStyle
+    UMA_In(["📥 接收 UMA 共享緩衝區<br/>(Input Shared<br/>UMA Buffers)"]):::applePill
 
-    subgraph Stage_1_to_3 ["🔄 第一階段 - 空間網格構建<br/>(Phase 1 - Grid Construction)"]
+    subgraph Stage_1_to_3 ["<b>🔄 第一階段 - 空間網格構建 (Phase 1 - Grid Construction)</b>"]
         direction LR
-        P1["Pass 1 - 清空網格<br/>(clearGrid)<br/>重置 32³ 空間網格<br/>(Reset 32³ Grid)"]:::passStyle
-        P2["Pass 2 - 原子計數<br/>(countGrid)<br/>統計每格粒子數<br/>(Atomic Particle Count)"]:::passStyle
-        P3["Pass 3 - 前綴和計算<br/>(prefixSumGrid)<br/>計算記憶體偏移量<br/>(Memory Offset Calc)"]:::passStyle
+        P1("Pass 1 - 清空網格<br/>(clearGrid)<br/>重置 32³ 空間網格<br/>(Reset 32³ Grid)"):::applePurple
+        P2("Pass 2 - 原子計數<br/>(countGrid)<br/>統計每格粒子數<br/>(Atomic Particle Count)"):::applePurple
+        P3("Pass 3 - 前綴和計算<br/>(prefixSumGrid)<br/>計算記憶體偏移量<br/>(Memory Offset Calc)"):::applePurple
         
         P1 --> P2 --> P3
     end
 
-    subgraph Stage_4_to_6 ["⚡ 第二階段 - 物理模擬與頂點生成<br/>(Phase 2 - Physics & Vertex Gen)"]
+    subgraph Stage_4_to_6 ["<b>⚡ 第二階段 - 物理模擬與頂點生成 (Phase 2 - Physics & Vertex Gen)</b>"]
         direction LR
-        P4["Pass 4 - 粒子重排<br/>(reorderParticles)<br/>連續記憶體對齊<br/>(Contiguous Memory)"]:::passStyle
-        P5["Pass 5 - 物理力場運算<br/>(computeGridParticles)<br/>3³鄰居/神之手/黑洞<br/>(Neighbors & Forces)"]:::passStyle
-        P6["Pass 6 - 頂點正交分解<br/>(updateMeshVertices)<br/>直寫 32B 四面體頂點<br/>(Write 32B Vertices)"]:::passStyle
+        P4("Pass 4 - 粒子重排<br/>(reorderParticles)<br/>連續記憶體對齊<br/>(Contiguous Memory)"):::appleIndigo
+        P5("Pass 5 - 物理力場運算<br/>(computeGridParticles)<br/>3³鄰居/神之手/黑洞<br/>(Neighbors & Forces)"):::appleIndigo
+        P6("Pass 6 - 頂點正交分解<br/>(updateMeshVertices)<br/>直寫 32B 四面體頂點<br/>(Write 32B Vertices)"):::appleIndigo
 
         P4 --> P5 --> P6
     end
 
-    Out_Sample(["📤 輸出動能抽樣<br/>(To Kinetic<br/>Sampler)"]):::ioStyle
-    Out_Mesh(["📤 輸出底層網格<br/>(To LowLevelMesh<br/>Render)"]):::ioStyle
+    Out_Sample(["📤 輸出動能抽樣<br/>(To Kinetic<br/>Sampler)"]):::applePill
+    Out_Mesh(["📤 輸出底層網格<br/>(To LowLevelMesh<br/>Render)"]):::applePill
 
     UMA_In ==> P1
     P3 ==> P4
     P5 -.-> Out_Sample
     P6 ==> Out_Mesh
 
-    class Stage_1_to_3,Stage_4_to_6 subStyle
+    %% 強制指定子圖容器為 Apple 淺灰底色與純黑高反差字體
+    style Stage_1_to_3 fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
+    style Stage_4_to_6 fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
 ```
+
 
 ```mermaid
 ---
 title: "子圖 B - 控制台、空間感知與渲染引擎細節 (Sub-diagram B - UI, Spatial & Render Modules)"
 config:
+  theme: base
+  themeVariables:
+    clusterBkg: "#F5F5F7"
+    clusterBorder: "#86868B"
+    titleColor: "#1D1D1F"
+    primaryTextColor: "#1D1D1F"
+    lineColor: "#424245"
   flowchart:
-    nodeSpacing: 50
-    rankSpacing: 60
-    padding: 20
+    curve: basis
+    nodeSpacing: 55
+    rankSpacing: 70
+    padding: 28
 ---
 flowchart TB
-    classDef uiStyle fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
-    classDef arStyle fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
-    classDef renderStyle fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#880E4F
-    classDef hubStyle fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100
-    classDef subStyle fill:#263238,stroke:#90A4AE,stroke-width:1.5px,color:#FFFFFF
+    %% 🍎 Apple HIG 高反差系統色票
+    classDef appleBlue fill:#E5F1FF,stroke:#0071E3,stroke-width:2px,color:#002B5B
+    classDef appleGreen fill:#E3F9E9,stroke:#28CD41,stroke-width:2px,color:#0A4D16
+    classDef appleOrange fill:#FFF0E0,stroke:#FF9500,stroke-width:2px,color:#6E3200
+    classDef appleIndigo fill:#EAEAFE,stroke:#5856D6,stroke-width:2px,color:#1F1D6B
 
-    subgraph SwiftUI_Windows ["🖥️ SwiftUI 模組化控制台<br/>(Modular UI Consoles)"]
+    subgraph SwiftUI_Windows ["<b>🖥️ SwiftUI 模組化控制台 (Modular UI Consoles)</b>"]
         direction LR
-        MainUI["主控制面板<br/>(ControlPanelView)<br/>規模/流速/邊界/黑洞<br/>(Scale/Time/Bounds)"]:::uiStyle
-        ColorUI["色彩與能階面板<br/>(ColorSchemeView)<br/>色票/熱力/流體拉伸<br/>(Palettes/Thermal)"]:::uiStyle
-        MatrixUI["力場矩陣設定<br/>(MatrixSettingsView)<br/>預設集/快照/作用力<br/>(Presets/Force Matrix)"]:::uiStyle
+        MainUI("主控制面板<br/>(ControlPanelView)<br/>規模/流速/邊界/黑洞<br/>(Scale/Time/Bounds)"):::appleBlue
+        ColorUI("色彩與能階面板<br/>(ColorSchemeView)<br/>色票/熱力/流體拉伸<br/>(Palettes/Thermal)"):::appleBlue
+        MatrixUI("力場矩陣設定<br/>(MatrixSettingsView)<br/>預設集/快照/作用力<br/>(Presets/Force Matrix)"):::appleBlue
     end
 
-    SimHub[("🧠 核心狀態與緩衝區<br/>(Simulator Core<br/>& UMA Buffers)")]:::hubStyle
+    SimHub[("🧠 核心狀態與緩衝區<br/>(Simulator Core<br/>& UMA Buffers)")]:::appleOrange
 
-    subgraph ARKit_Audio ["🖐️ ARKit 空間與聲學<br/>(Spatial & 3D Audio)"]
+    subgraph ARKit_Audio ["<b>🖐️ ARKit 空間與聲學 (Spatial & 3D Audio)</b>"]
         direction TB
-        HandTrack["手部骨骼追蹤<br/>(HandTrackingProvider)<br/>雙手食指與拇指追蹤<br/>(Index & Thumb Track)"]:::arStyle
-        GodHand["神之手力場更新<br/>(updateGodHandForce)<br/>✋吸引+1 / 🤏排斥-1<br/>(Attract / Repel)"]:::arStyle
-        SpatialAudio["3D 空間音效管理<br/>(SpatialAudioManager)<br/>程序化合成 WAV 聲學<br/>(Procedural WAV)"]:::arStyle
+        HandTrack("手部骨骼追蹤<br/>(HandTrackingProvider)<br/>雙手食指與拇指追蹤<br/>(Index & Thumb Track)"):::appleGreen
+        GodHand("神之手力場更新<br/>(updateGodHandForce)<br/>✋吸引+1 / 🤏排斥-1<br/>(Attract / Repel)"):::appleGreen
+        SpatialAudio("3D 空間音效管理<br/>(SpatialAudioManager)<br/>程序化合成 WAV 聲學<br/>(Procedural WAV)"):::appleGreen
         
         HandTrack --> GodHand
     end
 
-    subgraph RealityKit_Render ["🥽 RealityKit 3D 沉浸空間<br/>(ImmersiveView)"]
+    subgraph RealityKit_Render ["<b>🥽 RealityKit 3D 沉浸空間 (ImmersiveView)</b>"]
         direction TB
-        LowMesh["零拷貝底層網格<br/>(LowLevelMesh)<br/>依粒子種類切分部件<br/>(Split Mesh Parts)"]:::renderStyle
-        PBRMat["動態物理材質<br/>(Dynamic PBR Material)<br/>即時熱力自發光更新<br/>(Live Thermal Emissive)"]:::renderStyle
-        VisualOrbs["3D 視覺實體物件<br/>(3D Visual Entities)<br/>動態邊框/指尖光球/光子環<br/>(Bounds/Orbs/Photon Ring)"]:::renderStyle
+        LowMesh("零拷貝底層網格<br/>(LowLevelMesh)<br/>依粒子種類切分部件<br/>(Split Mesh Parts)"):::appleIndigo
+        PBRMat("動態物理材質<br/>(Dynamic PBR Material)<br/>即時熱力自發光更新<br/>(Live Thermal Emissive)"):::appleIndigo
+        VisualOrbs("3D 視覺實體物件<br/>(3D Visual Entities)<br/>動態邊框/指尖光球/光子環<br/>(Bounds/Orbs/Photon Ring)"):::appleIndigo
     end
 
-    %% 跨模組單向關聯 (避免跨子圖迴圈導致重疊)
+    %% 跨模組單向關聯
     MainUI & ColorUI & MatrixUI ==> SimHub
     GodHand ==> SimHub
     SimHub --> SpatialAudio
@@ -204,8 +293,12 @@ flowchart TB
     SimHub -.-> PBRMat
     SimHub ==> LowMesh
 
-    class SwiftUI_Windows,ARKit_Audio,RealityKit_Render subStyle
+    %% 強制指定子圖容器為 Apple 淺灰底色與純黑高反差字體
+    style SwiftUI_Windows fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
+    style ARKit_Audio fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
+    style RealityKit_Render fill:#F5F5F7,stroke:#86868B,stroke-width:2px,color:#1D1D1F
 ```
+
 
 ---
 
@@ -244,7 +337,7 @@ flowchart TB
    * 在主控制台將中心奇點切換為 **「🕳️ 黑洞雙極噴流」**，即可觀賞外圍冷藍色星雲吸積盤與中央南北極白熱化橘紅噴流光柱交織的天體奇觀！
 
 5. **子彈時間微距觀察（⏸ 凍結時間）**：
-   * 在粒子高速爆發或分裂瞬間，點擊 **「⏸ 凍結時間」**（或切換至 $0.2\times$ 超慢動作），直接走進透明盒子內部，$360^\circ$ 近距離觀察定格在半空中的彗星光梭結構。
+   * 在粒子高速爆發或分裂瞬間，點擊 **「⏸ 凍結時間」**（或切換至 $0.2\times$ 超慢動作），直接走進透明盒子內部，360° 近距離觀察定格在半空中的彗星光梭結構。
 
 ---
 
