@@ -172,6 +172,10 @@ struct ControlPanelView: View {
             particleCount = Double(simulator.particleCount)
             numTypes = Double(simulator.numTypes)
         }
+        // ✨ 當透過預設集快照改變粒子種類數時，同步更新主控制台滑桿顯示
+        .onChange(of: simulator.numTypes) { _, newTypes in
+            numTypes = Double(newTypes)
+        }
     }
     
     private var edgeColorLabel: String {
