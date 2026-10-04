@@ -22,7 +22,7 @@ struct ImmersiveView: View {
     
     @State var isScaling: Bool = false
     
-    // ✨ 新增：左右手食指尖的 3D 能量光球視覺指示器
+    // 左右手食指尖的 3D 能量光球視覺與空間音源指示器
     @State var leftHandOrb = ModelEntity()
     @State var rightHandOrb = ModelEntity()
 
@@ -30,15 +30,26 @@ struct ImmersiveView: View {
         RealityView { content in
             let boxSize: Float = 4.0
             
-            // ✨ 啟動 3D 粒子空間時，直接套用記憶的邊框灰階顏色與粗細建立 12 根邊框
+            // 啟動 3D 粒子空間時，直接套用記憶的邊框灰階顏色與粗細建立 12 根邊框
             containerBox.addBoxEdges(
                 size: boxSize,
                 grayscale: simulator.boxEdgeGrayscale,
                 thickness: simulator.boxEdgeThickness
             )
             
-            // ✨ 啟動 3D 粒子空間時，直接從 simulator 還原關閉前的精確大小、座標與旋轉角度
+            // 啟動 3D 粒子空間時，直接從 simulator 還原關閉前的精確大小、座標與旋轉角度
             simulator.applySavedTransform(to: containerBox)
+            
+            // ✨ 初始化左右手食指尖的 3D 能量光球並加入 containerBox
+            setupHandOrbs(in: containerBox)
+            
+            // ✨ 掛載 3D 空間環境共鳴音與左右手指尖力場音源
+            SpatialAudioManager.shared.attachSpatialAudio(
+                to: containerBox,
+                leftOrb: leftHandOrb,
+                rightOrb: rightHandOrb,
+                isMuted: simulator.isAudioMuted
+            )
             
             // 設定 12 根邊框專用的碰撞條
             let s = boxSize
@@ -73,7 +84,8 @@ struct ImmersiveView: View {
                 
                 simulator.updateFPS()
                 updateBoxWithHandTracking()
-                updateGodHandForceField() // ✨ 每幀更新雙手食指尖力場座標與光球特效
+                updateGodHandForceField() // 每幀更新雙手食指尖力場座標與光球特效
+                SpatialAudioManager.shared.updateAudioState(simulator: simulator) // ✨ 每幀更新 3D 空間音效狀態
                 simulator.updateSimulation()
                 syncParticlesToVisuals()
             }
@@ -120,7 +132,6 @@ struct ImmersiveView: View {
         .onChange(of: simulator.currentColors) { _, _ in
             updateParticleMaterials()
         }
-        // ✨ 當切換「熱力能量著色模式」或矩陣規則變動時，即時更新熱力能階材質
         .onChange(of: simulator.isKineticColorMode) { _, _ in
             updateParticleMaterials()
         }
@@ -132,7 +143,6 @@ struct ImmersiveView: View {
         .onChange(of: simulator.isBoxInteractionEnabled) { _, isEnabled in
             updateBoxInteractability(isEnabled: isEnabled)
         }
-        // ✨ 當調整主畫面的「邊框顏色」或「邊框粗細」滑桿時，即時更新 3D 透明盒子邊框
         .onChange(of: simulator.boxEdgeGrayscale) { _, newGray in
             containerBox.updateBoxEdgesAppearance(
                 grayscale: newGray,
@@ -146,9 +156,10 @@ struct ImmersiveView: View {
             )
         }
         .onDisappear {
-            // ✨ 當點擊「關閉 3D 粒子空間」時，立即將當前盒子的最終大小、座標與旋轉角度完整儲存
+            // 當點擊「關閉 3D 粒子空間」時，立即將當前盒子的最終大小、座標與旋轉角度完整儲存並停止音效
             simulator.saveBoxTransform(from: containerBox)
             simulator.handForces = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
+            SpatialAudioManager.shared.stopAll()
             frameSubscription?.cancel()
             frameSubscription = nil
             simulator.resetFPS()

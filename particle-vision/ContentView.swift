@@ -11,8 +11,8 @@ struct ContentView: View {
         
         VStack(alignment: .leading, spacing: 8) {
             
-            // MARK: - 1. 頂部標題列 + FPS 狀態膠囊
-            HStack(alignment: .center) {
+            // MARK: - 1. 頂部標題列 + 空間音效開關 + FPS 狀態膠囊
+            HStack(alignment: .center, spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.cyan)
@@ -21,6 +21,27 @@ struct ContentView: View {
                     .font(.title3.weight(.bold))
                 
                 Spacer()
+                
+                // ✨ 3D 空間音效靜音切換膠囊按鈕（統一使用 Color 型別解決編譯器型別推斷問題）
+                Button {
+                    simulator.isAudioMuted.toggle()
+                } label: {
+                    let audioColor: Color = simulator.isAudioMuted ? .gray : .cyan
+                    HStack(spacing: 4) {
+                        Image(systemName: simulator.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.3.fill")
+                            .font(.caption2.weight(.bold))
+                        Text(simulator.isAudioMuted ? "靜音" : "空間音效")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(audioColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.35), in: Capsule())
+                    .overlay(
+                        Capsule().stroke(audioColor.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
                 
                 // FPS 即時監控膠囊標籤
                 HStack(spacing: 6) {
@@ -77,14 +98,15 @@ struct ContentView: View {
                 }
             }
             
-            // MARK: - 3. 透明盒子手部操作 vs 神之手力場切換橫幅（告別刺眼全白按鈕）
+            // MARK: - 3. 透明盒子手部操作 vs 神之手力場切換橫幅
             Button {
                 simulator.isBoxInteractionEnabled.toggle()
             } label: {
+                let modeColor: Color = simulator.isBoxInteractionEnabled ? .cyan : .orange
                 HStack(spacing: 8) {
                     Image(systemName: simulator.isBoxInteractionEnabled ? "hand.draw.fill" : "wand.and.stars")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(simulator.isBoxInteractionEnabled ? .cyan : .orange)
+                        .foregroundStyle(modeColor)
                     
                     Text(simulator.isBoxInteractionEnabled ? "手勢模式：允許搬移與縮放透明盒子" : "手勢模式：已鎖定盒子 (雙手神之手力場啟用中)")
                         .font(.caption.weight(.semibold))
@@ -96,11 +118,8 @@ struct ContentView: View {
                         .font(.caption2.weight(.bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(
-                            (simulator.isBoxInteractionEnabled ? Color.cyan : Color.orange).opacity(0.22),
-                            in: Capsule()
-                        )
-                        .foregroundStyle(simulator.isBoxInteractionEnabled ? .cyan : .orange)
+                        .background(modeColor.opacity(0.22), in: Capsule())
+                        .foregroundStyle(modeColor)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -109,7 +128,7 @@ struct ContentView: View {
                         .fill(Color.black.opacity(0.28))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke((simulator.isBoxInteractionEnabled ? Color.cyan : Color.orange).opacity(0.45), lineWidth: 1)
+                                .stroke(modeColor.opacity(0.45), lineWidth: 1)
                         )
                 )
             }
@@ -151,7 +170,7 @@ struct ContentView: View {
         } else if simulator.currentFPS > 0 {
             return .orange
         } else {
-            return .secondary
+            return .gray
         }
     }
 }
