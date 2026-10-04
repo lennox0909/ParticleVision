@@ -8,12 +8,30 @@ import SwiftUI
 
 @Observable
 class ParticleSimulator {
+    
+    // 集中管理左右兩個獨立視窗的開啟狀態
     var showColorWindow: Bool = false
     var showMatrixWindow: Bool = false
+    
+    // 是否允許手部對透明盒子進行拖曳、旋轉或縮放操作
     var isBoxInteractionEnabled: Bool = true
+    
+    // 記憶透明盒子在 3D 空間中的座標、大小與旋轉角度
     var boxPosition: SIMD3<Float> = SIMD3<Float>(0.4, 1.1, -0.7)
     var boxScale: SIMD3<Float> = SIMD3<Float>(repeating: 0.1)
     var boxOrientation: simd_quatf = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+    
+    // ✨ 新增：透明盒子邊框灰階顏色 (0.0 = 全黑, 0.5 = 灰階, 1.0 = 全白) 與粗細 (0.002 ~ 0.050)
+    var boxEdgeGrayscale: Float = 0.85 {
+        didSet {
+            UserDefaults.standard.set(boxEdgeGrayscale, forKey: "BoxEdgeGrayscale")
+        }
+    }
+    var boxEdgeThickness: Float = 0.012 {
+        didSet {
+            UserDefaults.standard.set(boxEdgeThickness, forKey: "BoxEdgeThickness")
+        }
+    }
     
     // 👇 螢光強度的預設值在這裡 (範圍 0.0 ~ 5.0)
     var glowIntensity: Float = 2.0
@@ -161,6 +179,12 @@ class ParticleSimulator {
         }
     }
     
+    /// 重置 FPS 計數器（於關閉 3D 粒子空間時呼叫）
+    func resetFPS() {
+        currentFPS = 0
+        // 若你有定義 frameCount = 0 也一併在此歸零
+    }
+    
     // MARK: - 1. Forces (引力矩陣) 控制 API
     
     func getRule(from typeA: Int, to typeB: Int) -> Float {
@@ -263,9 +287,10 @@ class ParticleSimulator {
         return currentColors[type % currentColors.count]
     }
     
-    // MARK: - ✨ 透明盒子空間狀態 (Position / Scale / Orientation) 儲存與還原
     
-    /// 從 UserDefaults 讀取上次儲存的盒子空間狀態
+    // MARK: - 透明盒子空間狀態與外觀 (Position / Scale / Orientation / Edge Color & Thickness) 儲存與還原
+    
+    /// 從 UserDefaults 讀取上次儲存的盒子空間狀態與邊框設定
     func loadBoxTransformFromDisk() {
         if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
             self.boxScale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
@@ -276,9 +301,17 @@ class ParticleSimulator {
         if let savedRot = UserDefaults.standard.array(forKey: "BoxRotation") as? [Float], savedRot.count == 4 {
             self.boxOrientation = simd_quatf(ix: savedRot[0], iy: savedRot[1], iz: savedRot[2], r: savedRot[3])
         }
+        
+        // ✨ 讀取邊框灰階顏色與邊框粗細（若曾儲存過則還原）
+        if UserDefaults.standard.object(forKey: "BoxEdgeGrayscale") != nil {
+            self.boxEdgeGrayscale = UserDefaults.standard.float(forKey: "BoxEdgeGrayscale")
+        }
+        if UserDefaults.standard.object(forKey: "BoxEdgeThickness") != nil {
+            self.boxEdgeThickness = UserDefaults.standard.float(forKey: "BoxEdgeThickness")
+        }
     }
     
-    /// 即時記錄並儲存 containerBox 當前的空間座標、縮放大小與旋轉角度
+    /// 即時記錄並儲存 containerBox 當前的空間座標、縮放大小、旋轉角度與邊框設定
     func saveBoxTransform(from box: Entity) {
         self.boxPosition = box.position
         self.boxScale = box.scale
@@ -292,13 +325,23 @@ class ParticleSimulator {
             box.orientation.vector.z,
             box.orientation.vector.w
         ], forKey: "BoxRotation")
+        
+        // ✨ 同步確保邊框顏色與粗細寫入磁碟
+        UserDefaults.standard.set(self.boxEdgeGrayscale, forKey: "BoxEdgeGrayscale")
+        UserDefaults.standard.set(self.boxEdgeThickness, forKey: "BoxEdgeThickness")
     }
     
-    /// 將記憶的空間狀態套用至 containerBox
+    /// 將記憶的空間狀態（大小、旋轉、座標）與邊框外觀一併套用至 containerBox
     func applySavedTransform(to box: Entity) {
         box.scale = self.boxScale
         box.orientation = self.boxOrientation
         box.position = self.boxPosition
+        
+        // 同步套用記憶的邊框灰階顏色與粗細
+        box.updateBoxEdgesAppearance(
+            grayscale: self.boxEdgeGrayscale,
+            thickness: self.boxEdgeThickness
+        )
     }
     
     

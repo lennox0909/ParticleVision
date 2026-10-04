@@ -26,7 +26,12 @@ struct ImmersiveView: View {
         RealityView { content in
             let boxSize: Float = 4.0
             
-            containerBox.addBoxEdges(size: boxSize)
+            // ✨ 啟動 3D 粒子空間時，直接套用記憶的邊框灰階顏色與粗細建立 12 根邊框
+            containerBox.addBoxEdges(
+                size: boxSize,
+                grayscale: simulator.boxEdgeGrayscale,
+                thickness: simulator.boxEdgeThickness
+            )
             
             // ✨ 啟動 3D 粒子空間時，直接從 simulator 還原關閉前的精確大小、座標與旋轉角度
             simulator.applySavedTransform(to: containerBox)
@@ -113,12 +118,26 @@ struct ImmersiveView: View {
         .onChange(of: simulator.isBoxInteractionEnabled) { _, isEnabled in
             updateBoxInteractability(isEnabled: isEnabled)
         }
+        // ✨ 當調整主畫面的「邊框顏色」或「邊框粗細」滑桿時，即時更新 3D 透明盒子邊框
+        .onChange(of: simulator.boxEdgeGrayscale) { _, newGray in
+            containerBox.updateBoxEdgesAppearance(
+                grayscale: newGray,
+                thickness: simulator.boxEdgeThickness
+            )
+        }
+        .onChange(of: simulator.boxEdgeThickness) { _, newThickness in
+            containerBox.updateBoxEdgesAppearance(
+                grayscale: simulator.boxEdgeGrayscale,
+                thickness: newThickness
+            )
+        }
         .onDisappear {
             // ✨ 當點擊「關閉 3D 粒子空間」時，立即將當前盒子的最終大小、座標與旋轉角度完整儲存
             simulator.saveBoxTransform(from: containerBox)
             
             frameSubscription?.cancel()
             frameSubscription = nil
+            simulator.resetFPS()
         }
         .containerDragGesture(
             isScaling: $isScaling,

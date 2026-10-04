@@ -10,7 +10,7 @@ struct ParticleVisionApp: App {
             ContentView()
                 .environment(simulator)
         }
-        .defaultSize(width: 500, height: 500)
+        .defaultSize(width: 500, height: 680)
 
         // 2. 左側獨立原生視窗：Color Scheme 選擇器（✨ 高度由 760 收斂至 560，完美貼合 3D 滾輪）
         WindowGroup(id: "ColorSchemeWindow") {

@@ -104,7 +104,7 @@ struct ContentView: View {
         }
         .padding(28)
         // ✨ 配合移除下半部卡片，將 minHeight 由 780 下調至 460，消除底部多餘空白
-        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 460, maxHeight: .infinity)
+        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
         .onDisappear {
             if simulator.showColorWindow {
                 dismissWindow(id: "ColorSchemeWindow")
