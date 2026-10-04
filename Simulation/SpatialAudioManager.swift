@@ -118,8 +118,9 @@ final class SpatialAudioManager {
             if !boxCtrl.isPlaying {
                 boxCtrl.play()
             }
-            // 時間凍結時降低背景共鳴音量 (-24 dB)，正常演化時依時間流速微調增益 (-15 dB ~ -9 dB)
-            let targetGain: Double = simulator.isPaused ? -24.0 : Double(-15.0 + min(6.0, simulator.timeScale * 3.0))
+            // 開啟中心奇點時自動提升宇宙共鳴音量 (+3 ~ +6 dB)，營造深空黑洞重力場氛圍
+            let singularityBoost: Float = simulator.singularityMode > 0 ? (2.0 + simulator.singularityStrength * 1.5) : 0.0
+            let targetGain: Double = simulator.isPaused ? -24.0 : Double(-15.0 + min(8.0, simulator.timeScale * 3.0 + singularityBoost))
             boxCtrl.gain = targetGain
         }
         

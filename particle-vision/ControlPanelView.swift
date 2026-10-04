@@ -73,13 +73,13 @@ struct ControlPanelView: View {
                 .padding(.top, 1)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.vertical, 8)
             .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
             
-            // MARK: - 區塊 2：空間時間控制（慢動作微距觀察 / 暫停）與邊界物理模式切換
+            // MARK: - 區塊 2：時空流速、邊界物理與中心引力奇點 (Black Hole Singularity)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Label("時空流速與邊界物理", systemImage: "timer")
+                    Label("時空、邊界與中心奇點", systemImage: "hurricane")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -136,10 +136,40 @@ struct ControlPanelView: View {
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)
+                
+                // ✨ 3. 中心引力奇點模式切換 (關閉 / 星系吸積旋渦 / 黑洞雙極噴流)
+                Picker("中心奇點", selection: $bindableSimulator.singularityMode) {
+                    Text("關閉奇點").tag(0)
+                    Text("🌌 吸積盤旋渦").tag(1)
+                    Text("🕳️ 黑洞雙極噴流").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                
+                // 當啟用中心奇點時，顯示奇點重力強度滑桿
+                if simulator.singularityMode > 0 {
+                    HStack(spacing: 8) {
+                        Text(simulator.singularityMode == 1 ? "旋渦強度" : "黑洞質量")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(simulator.singularityMode == 1 ? .cyan : .purple)
+                            .frame(width: 56, alignment: .leading)
+                        
+                        Slider(value: $bindableSimulator.singularityStrength, in: 0.2...3.0, step: 0.1)
+                            .tint(simulator.singularityMode == 1 ? .cyan : .purple)
+                            .controlSize(.small)
+                        
+                        Text(String(format: "%.1fx", simulator.singularityStrength))
+                            .font(.system(.caption, design: .monospaced).bold())
+                            .foregroundStyle(simulator.singularityMode == 1 ? .cyan : .purple)
+                            .frame(width: 38, alignment: .trailing)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.vertical, 8)
             .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
+            .animation(.easeInOut(duration: 0.2), value: simulator.singularityMode)
             
             // MARK: - 區塊 3：透明盒子邊框顏色（全黑~灰階~全白）與粗細調整
             VStack(alignment: .leading, spacing: 5) {
@@ -153,7 +183,7 @@ struct ControlPanelView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                // 1. 邊框顏色（單行整合：標題 + 滑桿 + 圓點色票百分比 + 微調鈕）
+                // 1. 邊框顏色
                 HStack(spacing: 8) {
                     Text("邊框顏色")
                         .font(.caption.weight(.medium))
@@ -195,7 +225,7 @@ struct ControlPanelView: View {
                     .controlSize(.mini)
                 }
                 
-                // 2. 邊框粗細（單行整合：標題 + 滑桿 + 數值 + 微調鈕）
+                // 2. 邊框粗細
                 HStack(spacing: 8) {
                     Text("邊框粗細")
                         .font(.caption.weight(.medium))
@@ -232,7 +262,7 @@ struct ControlPanelView: View {
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.vertical, 8)
             .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
         }
         .onAppear {

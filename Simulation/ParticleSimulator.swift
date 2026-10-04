@@ -28,6 +28,12 @@ class ParticleSimulator {
         }
     }
     
+    // ✨ 新增：引力中心奇點模式 (0 = 關閉, 1 = 🌌 星系吸積旋渦, 2 = 🕳️ 黑洞雙極噴流)
+    var singularityMode: Int = 0
+    
+    // ✨ 新增：中心奇點引力強度 (0.2x 微弱引力核 ~ 3.0x 超大質量黑洞)
+    var singularityStrength: Float = 1.2
+    
     // ✨ 新增：宇宙邊界物理模式 (false = 📦 彈性撈網邊界 Bounce, true = ♾️ 無縫週期穿越 Wrap-around)
     var isWrapBoundary: Bool = false
     
@@ -95,7 +101,7 @@ class ParticleSimulator {
     var particleScale: Float = 0.005
     
     // ✨ 新增：動能流體拉伸強度 (0.0 = 維持原狀, 1.0 ~ 5.0 = 依速度向量自動拉長為彗星光梭)
-    var velocityStretch: Float = 2.0
+    var velocityStretch: Float = 1.0
     
     // ✨ 是否啟用「熱力能量著色模式 (Kinetic Heatmap Mode)」
     var isKineticColorMode: Bool = false

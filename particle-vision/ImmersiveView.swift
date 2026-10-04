@@ -25,6 +25,8 @@ struct ImmersiveView: View {
     // 左右手食指尖的 3D 能量光球視覺與空間音源指示器
     @State var leftHandOrb = ModelEntity()
     @State var rightHandOrb = ModelEntity()
+    
+    @State var singularityOrb = ModelEntity()
 
     var body: some View {
         RealityView { content in
@@ -42,6 +44,8 @@ struct ImmersiveView: View {
             
             // ✨ 初始化左右手食指尖的 3D 能量光球並加入 containerBox
             setupHandOrbs(in: containerBox)
+            
+            setupSingularityOrb(in: containerBox)
             
             // ✨ 掛載 3D 空間環境共鳴音與左右手指尖力場音源
             SpatialAudioManager.shared.attachSpatialAudio(
@@ -154,6 +158,12 @@ struct ImmersiveView: View {
                 grayscale: simulator.boxEdgeGrayscale,
                 thickness: newThickness
             )
+        }
+        .onChange(of: simulator.singularityMode) { _, _ in
+            updateSingularityVisual()
+        }
+        .onChange(of: simulator.singularityStrength) { _, _ in
+            updateSingularityVisual()
         }
         .onDisappear {
             // 當點擊「關閉 3D 粒子空間」時，立即將當前盒子的最終大小、座標與旋轉角度完整儲存並停止音效
