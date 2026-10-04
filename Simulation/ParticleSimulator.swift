@@ -19,6 +19,10 @@ class ParticleSimulator {
     // 是否允許手部對透明盒子進行拖曳、旋轉或縮放操作
     var isBoxInteractionEnabled: Bool = true
     
+    // ✨ 左右手「神之手」力場資料 [左手, 右手]（加上 @ObservationIgnored 避免每幀觸發 UI 重繪與巨集歧義）
+    @ObservationIgnored
+    var handForces: [SIMD4<Float>] = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
+    
     // 記憶透明盒子在 3D 空間中的座標、大小與旋轉角度
     var boxPosition: SIMD3<Float> = SIMD3<Float>(0.4, 1.1, -0.7)
     var boxScale: SIMD3<Float> = SIMD3<Float>(repeating: 0.1)

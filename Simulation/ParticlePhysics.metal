@@ -7,6 +7,7 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
                                  constant float* ruleMatrix [[buffer(2)]],
                                  constant SimParams& params [[buffer(3)]],
                                  device const Cell* grid [[buffer(4)]],
+                                 constant float4* handForces [[buffer(5)]],
                                  uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
 
@@ -80,6 +81,39 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     
     // 4. 套用微小擾動打破網格對稱性
     force += jitter * 0.1f;
+
+    // 5. ✨ 雙手「神之手」粒子力場互動 (0: 左手, 1: 右手)
+    for (int h = 0; h < 2; h++) {
+        float mode = handForces[h].w;
+        if (abs(mode) > 0.01f) {
+            float3 handPos = handForces[h].xyz;
+            float3 toHand = handPos - p.position;
+            float dist = fast::length(toHand);
+            
+            // 作用範圍：局部座標半徑 1.25 內（涵蓋約三分之一個盒子的廣域力場）
+            float influenceRadius = 1.25f;
+            if (dist > 0.001f && dist < influenceRadius) {
+                float3 dir = toHand / dist;
+                float falloff = 1.0f - (dist / influenceRadius);
+                
+                if (mode > 0.0f) {
+                    // ✋ 張開手模式 (+1.0)：星雲漩渦引力場
+                    // 距離 < 0.12 時產生微排斥核心，避免所有粒子重疊縮成單一亮點；外圍則強力吸引並加上水平切線旋轉力
+                    if (dist < 0.12f) {
+                        force -= dir * (1.0f - dist / 0.12f) * 8.0f;
+                    } else {
+                        force += dir * (falloff * falloff) * 14.0f;
+                        // 切線軌道旋力：讓聚集過來的粒子繞著指尖優雅公轉
+                        float3 swirlDir = normalize(cross(dir, float3(0.0f, 1.0f, 0.0f)) + float3(0.001f));
+                        force += swirlDir * falloff * 5.5f;
+                    }
+                } else {
+                    // 🤏 捏合手指模式 (-1.0)：超新星斥力衝擊波
+                    force -= dir * (falloff * falloff) * 32.0f;
+                }
+            }
+        }
+    }
     
     p.velocity += force * params.dt;
     p.velocity *= params.friction;

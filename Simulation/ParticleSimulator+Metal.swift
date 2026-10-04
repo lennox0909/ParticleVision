@@ -217,6 +217,11 @@ extension ParticleSimulator {
         computeEncoder.setBuffer(ruleMatrixBuffer, offset: 0, index: 2)
         computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 3)
         computeEncoder.setBuffer(gridBuffer, offset: 0, index: 4)
+        
+        // ✨ 新增：將左右手「神之手」力場座標與狀態傳入 buffer(5)
+        var currentHandForces = self.handForces
+        computeEncoder.setBytes(&currentHandForces, length: MemoryLayout<SIMD4<Float>>.stride * 2, index: 5)
+        
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
         // ✨ 確保粒子座標寫入完畢後，再執行下方的頂點網格更新
