@@ -30,6 +30,99 @@ extension RuleMatrixView {
         }
     }
     
+    // MARK: - 1.5 ✨ 經典生命宇宙預設集與自訂快照橫向畫廊
+    var presetGallerySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("經典生態系與自訂快照", systemImage: "sparkles.rectangle.stack.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                Button {
+                    newPresetName = ""
+                    showSavePresetAlert = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("儲存當前快照")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+                .controlSize(.mini)
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(simulator.allPresets) { preset in
+                        let isSelected = (simulator.activePresetID == preset.id)
+                        
+                        ZStack(alignment: .topTrailing) {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    simulator.applyPreset(preset)
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: preset.icon)
+                                        .font(.subheadline)
+                                        .foregroundStyle(isSelected ? .cyan : (preset.isBuiltIn ? .orange : .mint))
+                                        .frame(width: 24, height: 24)
+                                        .background(Color.white.opacity(0.1), in: Circle())
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(preset.name)
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(1)
+                                        Text(preset.subtitle)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.trailing, preset.isBuiltIn ? 4 : 16)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(isSelected ? Color.cyan.opacity(0.25) : Color.black.opacity(0.28))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isSelected ? Color.cyan : Color.white.opacity(0.12), lineWidth: isSelected ? 1.5 : 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // 若為使用者自訂快照，右上角提供小巧的刪除按鈕
+                            if !preset.isBuiltIn {
+                                Button {
+                                    withAnimation {
+                                        simulator.deleteCustomPreset(preset)
+                                    }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .padding(5)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 14))
+    }
+    
     // MARK: - 2. 頂部模式切換器 + Popover 說明氣泡
     var tabPickerSection: some View {
         HStack(spacing: 6) {

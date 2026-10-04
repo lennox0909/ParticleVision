@@ -8,6 +8,9 @@ import SwiftUI
 
 @Observable
 class ParticleSimulator {
+    // ✨ 新增：使用者自訂儲存的宇宙快照清單與當前啟用的快照 ID
+    var customPresets: [SimulationPreset] = []
+    var activePresetID: UUID? = nil
     
     // 集中管理左右兩個獨立視窗的開啟狀態
     var showColorWindow: Bool = false
@@ -109,6 +112,7 @@ class ParticleSimulator {
         setupMetal()
         setupBuffers()
         loadBoxTransformFromDisk()
+        loadCustomPresetsFromDisk() // ✨ 載入使用者自訂快照
     }
     
     /// ✨ 套用或重新生成指定的 Color Scheme
