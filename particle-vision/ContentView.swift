@@ -75,7 +75,21 @@ struct ContentView: View {
                 }
             }
             
-            // MARK: - 核心參數控制面板（✨ 移除 ScrollView，徹底消除底部裁切現象）
+            // MARK: - 透明盒子手部操作防誤觸開關
+            Toggle(isOn: $bindableSim.isBoxInteractionEnabled) {
+                HStack(spacing: 8) {
+                    Image(systemName: simulator.isBoxInteractionEnabled ? "hand.draw.fill" : "lock.fill")
+                        .font(.subheadline)
+                    Text(simulator.isBoxInteractionEnabled ? "允許手部操作透明盒子" : "已鎖定透明盒子 (防誤觸觀察模式)")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+            }
+            .toggleStyle(.button)
+            .tint(simulator.isBoxInteractionEnabled ? .cyan : .orange)
+            
+            // MARK: - 核心參數控制面板（宇宙規模設定）
             ControlPanelView()
             
             Spacer(minLength: 0)
@@ -89,8 +103,8 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(28)
-        // ✨ 彈性 Frame 支援拉動視窗四角縮放，並確保最小高度足以完整容納所有卡片
-        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 740, maxHeight: .infinity)
+        // ✨ 配合移除下半部卡片，將 minHeight 由 780 下調至 460，消除底部多餘空白
+        .frame(minWidth: 460, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
         .onDisappear {
             if simulator.showColorWindow {
                 dismissWindow(id: "ColorSchemeWindow")

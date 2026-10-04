@@ -75,61 +75,40 @@ struct ControlPanelView: View {
             .padding(14)
             .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
             
-            // MARK: - 區塊 2：即時物理與視覺微調（拉動立即生效）
+            // MARK: - 區塊 2：✨ 透明盒子邊框顏色（全黑~灰階~全白）與粗細調整（位於啟動 3D 粒子空間按鈕正上方）
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("即時物理與視覺", systemImage: "slider.horizontal.3")
+                    Label("透明盒子外觀", systemImage: "squareshape.split.2x2")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("即時生效")
+                    Text("自動記憶設定")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 
-                // 3. 粒子大小
+                // 1. 邊框顏色（全黑 0.0 -> 灰階 0.5 -> 全白 1.0）
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("粒子大小")
+                    HStack(spacing: 6) {
+                        Text("邊框顏色 (黑 ↔ 白)")
                             .font(.subheadline.weight(.medium))
                         Spacer()
-                        Text(String(format: "%.3f", simulator.particleScale))
+                        Circle()
+                            .fill(Color(white: Double(simulator.boxEdgeGrayscale)))
+                            .frame(width: 14, height: 14)
+                            .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
+                        Text(edgeColorLabel)
                             .font(.system(.subheadline, design: .monospaced).bold())
-                            .foregroundStyle(.secondary)
-                    }
-                    Slider(value: $bindableSimulator.particleScale, in: 0.005...0.050, step: 0.001)
-                }
-                
-                // 4. 空間摩擦力
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("空間摩擦力")
-                            .font(.subheadline.weight(.medium))
-                        Spacer()
-                        Text(String(format: "%.2f", simulator.friction))
-                            .font(.system(.subheadline, design: .monospaced).bold())
-                            .foregroundStyle(.secondary)
-                    }
-                    Slider(value: $bindableSimulator.friction, in: 0.01...0.99, step: 0.01)
-                }
-                
-                // 5. 螢光強度
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("螢光強度")
-                            .font(.subheadline.weight(.medium))
-                        Spacer()
-                        Text(String(format: "%.1f", simulator.glowIntensity))
-                            .font(.system(.subheadline, design: .monospaced).bold())
-                            .foregroundStyle(simulator.glowIntensity > 0 ? .cyan : .secondary)
+                            .foregroundStyle(.cyan)
                     }
                     
-                    HStack(spacing: 12) {
-                        Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.5)
-                            .tint(.cyan)
+                    HStack(spacing: 10) {
+                        Slider(value: $bindableSimulator.boxEdgeGrayscale, in: 0.0...1.0, step: 0.01)
+                            .tint(Color(white: Double(max(0.35, simulator.boxEdgeGrayscale))))
                         
                         Button {
-                            simulator.glowIntensity = max(0, simulator.glowIntensity - 0.1)
+                            let next = max(0.0, simulator.boxEdgeGrayscale - 0.05)
+                            simulator.boxEdgeGrayscale = (next * 100).rounded() / 100
                         } label: {
                             Image(systemName: "minus")
                         }
@@ -138,7 +117,45 @@ struct ControlPanelView: View {
                         .controlSize(.small)
                         
                         Button {
-                            simulator.glowIntensity = min(5, simulator.glowIntensity + 0.1)
+                            let next = min(1.0, simulator.boxEdgeGrayscale + 0.05)
+                            simulator.boxEdgeGrayscale = (next * 100).rounded() / 100
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.small)
+                    }
+                }
+                
+                // 2. 邊框粗細
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("邊框粗細")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text(String(format: "%.3f", simulator.boxEdgeThickness))
+                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .foregroundStyle(.cyan)
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Slider(value: $bindableSimulator.boxEdgeThickness, in: 0.002...0.050, step: 0.001)
+                            .tint(.cyan)
+                        
+                        Button {
+                            let next = max(0.002, simulator.boxEdgeThickness - 0.002)
+                            simulator.boxEdgeThickness = (next * 1000).rounded() / 1000
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.small)
+                        
+                        Button {
+                            let next = min(0.050, simulator.boxEdgeThickness + 0.002)
+                            simulator.boxEdgeThickness = (next * 1000).rounded() / 1000
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -155,5 +172,12 @@ struct ControlPanelView: View {
             particleCount = Double(simulator.particleCount)
             numTypes = Double(simulator.numTypes)
         }
+    }
+    
+    private var edgeColorLabel: String {
+        let pct = Int((simulator.boxEdgeGrayscale * 100).rounded())
+        if pct == 0 { return "全黑 (0%)" }
+        if pct == 100 { return "全白 (100%)" }
+        return "\(pct)%"
     }
 }

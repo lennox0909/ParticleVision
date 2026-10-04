@@ -93,7 +93,6 @@ extension RuleMatrixView {
     // MARK: - 3. 2D 互動式矩陣網格 (Heat Map Grid)
     func matrixGridSection(count: Int, cellSize: CGFloat) -> some View {
         VStack(spacing: 4) {
-            // 頂部欄位圓點列 (全選 + Col 0..<count)
             HStack(spacing: 4) {
                 Button {
                     selection = .all
@@ -126,7 +125,6 @@ extension RuleMatrixView {
                 }
             }
             
-            // 每一列 (左側 Row 圓點 + 矩陣方格)
             ForEach(0..<count, id: \.self) { row in
                 HStack(spacing: 4) {
                     Button {
@@ -170,7 +168,62 @@ extension RuleMatrixView {
         .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
     }
     
-    // MARK: - 4. 底部控制列 (包含滑桿與 － / ＋ 精準微調按鈕)
+    // MARK: - 4. ✨ 即時物理環境：空間摩擦力控制卡片（位於矩陣熱力圖網格正下方）
+    var frictionControlSection: some View {
+        @Bindable var bindableSimulator = simulator
+        
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("即時物理環境", systemImage: "wind")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("即時生效")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("空間摩擦力")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text(String(format: "%.2f", simulator.friction))
+                        .font(.system(.subheadline, design: .monospaced).bold())
+                        .foregroundStyle(.cyan)
+                }
+                
+                HStack(spacing: 10) {
+                    Slider(value: $bindableSimulator.friction, in: 0.01...0.99, step: 0.01)
+                        .tint(.cyan)
+                    
+                    Button {
+                        let next = max(0.01, simulator.friction - 0.01)
+                        simulator.friction = (next * 100).rounded() / 100
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.small)
+                    
+                    Button {
+                        let next = min(0.99, simulator.friction + 0.01)
+                        simulator.friction = (next * 100).rounded() / 100
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - 5. 底部控制列 (包含滑桿與 － / ＋ 精準微調按鈕)
     var bottomControlSection: some View {
         HStack(spacing: 10) {
             Button {
@@ -199,7 +252,6 @@ extension RuleMatrixView {
             )
             .tint(sliderTintColor)
             
-            // 減少按鈕 (Forces: -0.01 / Min & Max Radius: -1)
             Button {
                 adjustSliderValue(by: -sliderStep)
             } label: {
@@ -209,7 +261,6 @@ extension RuleMatrixView {
             .buttonBorderShape(.circle)
             .controlSize(.small)
             
-            // 增加按鈕 (Forces: +0.01 / Min & Max Radius: +1)
             Button {
                 adjustSliderValue(by: sliderStep)
             } label: {
