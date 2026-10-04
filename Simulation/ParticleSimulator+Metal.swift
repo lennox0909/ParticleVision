@@ -230,6 +230,10 @@ extension ParticleSimulator {
             var boundaryMode: UInt32 = self.isWrapBoundary ? 1 : 0
             computeEncoder.setBytes(&boundaryMode, length: MemoryLayout<UInt32>.stride, index: 6)
             
+            // ✨ 新增：傳入中心奇點力場參數至 buffer(7) (x: 模式 0/1/2, y: 奇點強度)
+            var singularityParams = SIMD2<Float>(Float(self.singularityMode), self.singularityStrength)
+            computeEncoder.setBytes(&singularityParams, length: MemoryLayout<SIMD2<Float>>.stride, index: 7)
+            
             computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                                 threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
             computeEncoder.memoryBarrier(scope: .buffers)
