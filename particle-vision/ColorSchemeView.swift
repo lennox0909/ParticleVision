@@ -4,12 +4,26 @@ struct ColorSchemeView: View {
     @Environment(ParticleSimulator.self) private var simulator
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    
     @State private var showHelpPopover: Bool = false
+    @State private var selectedCategory: String = "All"
+    
+    private let categoryTabs = ["All", "Static", "Generative", "Experimental"]
+    
+    /// 依據目前選取的分類篩選滾輪項目（選 All 時可一鏡到底滾動全部 37 種色票）
+    private var filteredPalettes: [PaletteOption] {
+        if selectedCategory == "All" {
+            return ColorPaletteGenerator.palettes
+        } else {
+            return ColorPaletteGenerator.palettes.filter { $0.category == selectedCategory }
+        }
+    }
     
     var body: some View {
+        @Bindable var bindableSimulator = simulator
         let count = simulator.numTypes
         
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 12) {
             
             // MARK: - 1. 標題列與 ⓘ 說明氣泡 + 重新骰色按鈕
             HStack(spacing: 8) {
@@ -32,9 +46,9 @@ struct ColorSchemeView: View {
                 .buttonStyle(.plain)
                 .popover(isPresented: $showHelpPopover, arrowEdge: .top) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Choose from static or generative color palette generators.")
-                            .font(.callout)
-                        Text("**Static** palettes are fixed, while **generative** ones produce new themed variations each time.")
+                        Text("轉動滾輪即可即時切換色票。")
+                            .font(.callout.bold())
+                        Text("**Static** 為固定漸層；**Generative** 與 **Experimental** 每次選中或點擊骰子都會生成全新的主題變體。")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -47,102 +61,171 @@ struct ColorSchemeView: View {
                 Button {
                     simulator.applyPalette(id: simulator.selectedPaletteID)
                 } label: {
-                    Image(systemName: "dice.fill")
-                        .font(.subheadline)
+                    HStack(spacing: 4) {
+                        Image(systemName: "dice.fill")
+                        Text("隨機變體")
+                            .font(.caption.weight(.semibold))
+                    }
                 }
                 .buttonStyle(.bordered)
+                .tint(.cyan)
                 .controlSize(.small)
                 .help("重新生成當前色票變化")
             }
             
-            // MARK: - 2. 當前啟用的粒子色票預覽列
-            VStack(alignment: .leading, spacing: 8) {
-                Text("目前套用色票 (\(currentPaletteName)):")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                HStack(spacing: 10) {
-                    ForEach(0..<count, id: \.self) { typeIdx in
-                        Circle()
-                            .fill(simulator.colorForType(typeIdx))
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                Circle().stroke(Color.white.opacity(0.4), lineWidth: 1)
-                            )
+            // MARK: - 2. 當前啟用的粒子色票預覽列 + 粒子大小與螢光強度控制
+            VStack(alignment: .leading, spacing: 10) {
+                // 色票圓點預覽
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("目前套用色票:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(currentPalette?.name ?? "Rainbow")
+                            .font(.caption.bold())
+                            .foregroundStyle(.cyan)
+                        Spacer()
+                        Text(currentPalette?.category.uppercased() ?? "STATIC")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.12), in: Capsule())
+                            .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    
+                    HStack(spacing: 10) {
+                        ForEach(0..<count, id: \.self) { typeIdx in
+                            Circle()
+                                .fill(simulator.colorForType(typeIdx))
+                                .frame(width: 24, height: 24)
+                                .overlay(
+                                    Circle().stroke(Color.white.opacity(0.4), lineWidth: 1)
+                                )
+                        }
+                        Spacer()
+                    }
                 }
-                .padding(12)
-                .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                
+                Divider()
+                    .overlay(Color.white.opacity(0.15))
+                
+                // 控制項 1：粒子大小
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("粒子大小")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text(String(format: "%.3f", simulator.particleScale))
+                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $bindableSimulator.particleScale, in: 0.005...0.050, step: 0.001)
+                }
+                
+                // 控制項 2：螢光強度
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("螢光強度")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text(String(format: "%.1f", simulator.glowIntensity))
+                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .foregroundStyle(simulator.glowIntensity > 0 ? .cyan : .secondary)
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.1)
+                            .tint(.cyan)
+                        
+                        Button {
+                            let next = max(0, simulator.glowIntensity - 0.1)
+                            simulator.glowIntensity = (next * 10).rounded() / 10
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.small)
+                        
+                        Button {
+                            let next = min(5, simulator.glowIntensity + 0.1)
+                            simulator.glowIntensity = (next * 10).rounded() / 10
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.small)
+                    }
+                }
             }
+            .padding(14)
+            .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 14))
+            .fixedSize(horizontal: false, vertical: true)
             
-            Divider()
-            
-            // MARK: - 3. 分類捲動色票選單
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(ColorPaletteGenerator.categories, id: \.self) { category in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Text(category.uppercased())
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.secondary)
+            // MARK: - 3. ✨ 分類選單 (修正壓縮與點選問題) + 3D 滾輪色票選擇器
+            VStack(alignment: .leading, spacing: 10) {
+                // 改用 visionOS 原生 Segmented Picker，並鎖定高度與優先層級 (zIndex)，防止被壓縮或被滾輪遮擋
+                Picker("Category", selection: $selectedCategory) {
+                    ForEach(categoryTabs, id: \.self) { cat in
+                        Text(cat).tag(cat)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(height: 36)
+                .fixedSize(horizontal: false, vertical: true)
+                .zIndex(1)
+                .onChange(of: selectedCategory) { _, _ in
+                    // 切換分類時，若當前色票不在該分類內，自動跳至該分類第一個色票並立即套用
+                    if let firstInCat = filteredPalettes.first,
+                       !filteredPalettes.contains(where: { $0.id == simulator.selectedPaletteID }) {
+                        simulator.applyPalette(id: firstInCat.id)
+                    }
+                }
+                
+                // 3D 滾輪選單：固定高度 190pt，並限制觸控區域不超出外框
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.cyan.opacity(0.55), lineWidth: 1.5)
+                        .fill(Color.cyan.opacity(0.10))
+                        .frame(height: 38)
+                        .padding(.horizontal, 10)
+                        .allowsHitTesting(false)
+                    
+                    Picker("Color Palette", selection: $bindableSimulator.selectedPaletteID) {
+                        ForEach(filteredPalettes) { option in
+                            HStack(spacing: 8) {
+                                Text(option.name)
+                                    .font(.headline)
                                 
-                                if category != "Static" {
-                                    Text("✨ 隨機變體")
-                                        .font(.caption2)
-                                        .foregroundStyle(.cyan.opacity(0.8))
+                                if option.category != "Static" && option.category != "Default" {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption)
+                                        .foregroundStyle(.cyan)
                                 }
                             }
-                            .padding(.horizontal, 4)
-                            
-                            let options = ColorPaletteGenerator.palettes.filter { $0.category == category }
-                            
-                            ForEach(options) { option in
-                                let isSelected = (simulator.selectedPaletteID == option.id)
-                                
-                                Button {
-                                    simulator.applyPalette(id: option.id)
-                                } label: {
-                                    HStack {
-                                        Text(option.name)
-                                            .font(.subheadline)
-                                            .fontWeight(isSelected ? .bold : .regular)
-                                            .foregroundStyle(isSelected ? .white : .primary)
-                                        
-                                        Spacer()
-                                        
-                                        if isSelected {
-                                            Image(systemName: option.category == "Static" ? "checkmark.circle.fill" : "sparkles")
-                                                .foregroundStyle(.cyan)
-                                                .font(.subheadline)
-                                        }
-                                    }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(isSelected ? Color.cyan.opacity(0.28) : Color.black.opacity(0.20))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(isSelected ? Color.cyan : Color.clear, lineWidth: 1.5)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
+                            .tag(option.id)
                         }
                     }
+                    .pickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 190)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .onChange(of: simulator.selectedPaletteID) { _, newID in
+                        simulator.applyPalette(id: newID)
+                    }
                 }
-                .padding(.trailing, 6)
+                .frame(maxWidth: .infinity)
+                .frame(height: 190)
+                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
             }
+            
+            Spacer(minLength: 0)
         }
-        .padding(35)
-        // ✨ 當使用者按視窗底部的系統「✕」關閉時，自動將主控制台的按鈕跳回未選取狀態
+        .padding(24)
         .onAppear {
-            // ✨ 防呆機制：如果是系統重開 App 時誤把子視窗叫出來（此時按鈕狀態為 false），
-            // 則立即關閉自己，並強制喚醒主控制台視窗！
             if !simulator.showColorWindow {
                 openWindow(id: "MainControlWindow")
                 dismissWindow(id: "ColorSchemeWindow")
@@ -153,7 +236,7 @@ struct ColorSchemeView: View {
         }
     }
     
-    private var currentPaletteName: String {
-        ColorPaletteGenerator.palettes.first(where: { $0.id == simulator.selectedPaletteID })?.name ?? "Rainbow"
+    private var currentPalette: PaletteOption? {
+        ColorPaletteGenerator.palettes.first(where: { $0.id == simulator.selectedPaletteID })
     }
 }

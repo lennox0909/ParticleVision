@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct RuleMatrixView: View {
-    // 移除 private 以便讓拆分至其他檔案的 Extension 存取
     @Environment(ParticleSimulator.self) var simulator
     @Environment(\.openWindow) var openWindow
     @Environment(\.dismissWindow) var dismissWindow
@@ -12,9 +11,9 @@ struct RuleMatrixView: View {
     
     var body: some View {
         let count = simulator.numTypes
-        let cellSize: CGFloat = count <= 6 ? 46 : 36
+        let cellSize: CGFloat = count <= 6 ? 44 : 35
         
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             // 1. 頂部標題與重置按鈕列
             headerSection
             
@@ -24,12 +23,15 @@ struct RuleMatrixView: View {
             // 3. 2D 互動式矩陣熱力圖網格
             matrixGridSection(count: count, cellSize: cellSize)
             
+            // 4. ✨ 移入：即時物理環境（空間摩擦力）控制卡片，位於矩陣網格正下方
+            frictionControlSection
+            
             Spacer(minLength: 0)
             
-            // 4. 底部滑桿與 － / ＋ 精準微調控制列
+            // 5. 底部矩陣滑桿與 － / ＋ 精準微調控制列
             bottomControlSection
         }
-        .padding(35)
+        .padding(30)
         .onChange(of: count) { _, newCount in
             validateSelection(for: newCount)
         }

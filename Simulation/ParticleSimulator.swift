@@ -10,7 +10,13 @@ import SwiftUI
 class ParticleSimulator {
     var showColorWindow: Bool = false
     var showMatrixWindow: Bool = false
-    var glowIntensity: Float = 0.0
+    var isBoxInteractionEnabled: Bool = true
+    var boxPosition: SIMD3<Float> = SIMD3<Float>(0.4, 1.1, -0.7)
+    var boxScale: SIMD3<Float> = SIMD3<Float>(repeating: 0.1)
+    var boxOrientation: simd_quatf = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+    
+    // 👇 螢光強度的預設值在這裡 (範圍 0.0 ~ 5.0)
+    var glowIntensity: Float = 2.0
     var meshResource: MeshResource!
     var lowLevelMesh: LowLevelMesh?
     var updateMeshPipeline: MTLComputePipelineState!
@@ -41,10 +47,11 @@ class ParticleSimulator {
     
     var needsVisualRebuild: Bool = false
     
-    // 只負責控制 3D 視覺外觀大小，與物理半徑完全解耦
-    var particleScale: Float = 0.015
+    // 👇 粒子大小的預設值在這裡 (範圍 0.005 ~ 0.050) 只負責控制 3D 視覺外觀大小，與物理半徑完全解耦
+    var particleScale: Float = 0.005
     
-    var friction: Float = 0.95 {
+    // 空間摩擦力預設值
+    var friction: Float = 0.65 {
         didSet {
             params.friction = friction
             updateParamsBuffer()
@@ -83,6 +90,7 @@ class ParticleSimulator {
         
         setupMetal()
         setupBuffers()
+        loadBoxTransformFromDisk()
     }
     
     /// ✨ 套用或重新生成指定的 Color Scheme
@@ -254,4 +262,45 @@ class ParticleSimulator {
         guard !currentColors.isEmpty else { return .white }
         return currentColors[type % currentColors.count]
     }
+    
+    // MARK: - ✨ 透明盒子空間狀態 (Position / Scale / Orientation) 儲存與還原
+    
+    /// 從 UserDefaults 讀取上次儲存的盒子空間狀態
+    func loadBoxTransformFromDisk() {
+        if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
+            self.boxScale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
+        }
+        if let savedPos = UserDefaults.standard.array(forKey: "BoxPosition") as? [Float], savedPos.count == 3 {
+            self.boxPosition = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
+        }
+        if let savedRot = UserDefaults.standard.array(forKey: "BoxRotation") as? [Float], savedRot.count == 4 {
+            self.boxOrientation = simd_quatf(ix: savedRot[0], iy: savedRot[1], iz: savedRot[2], r: savedRot[3])
+        }
+    }
+    
+    /// 即時記錄並儲存 containerBox 當前的空間座標、縮放大小與旋轉角度
+    func saveBoxTransform(from box: Entity) {
+        self.boxPosition = box.position
+        self.boxScale = box.scale
+        self.boxOrientation = box.orientation
+        
+        UserDefaults.standard.set([box.scale.x, box.scale.y, box.scale.z], forKey: "BoxScale")
+        UserDefaults.standard.set([box.position.x, box.position.y, box.position.z], forKey: "BoxPosition")
+        UserDefaults.standard.set([
+            box.orientation.vector.x,
+            box.orientation.vector.y,
+            box.orientation.vector.z,
+            box.orientation.vector.w
+        ], forKey: "BoxRotation")
+    }
+    
+    /// 將記憶的空間狀態套用至 containerBox
+    func applySavedTransform(to box: Entity) {
+        box.scale = self.boxScale
+        box.orientation = self.boxOrientation
+        box.position = self.boxPosition
+    }
+    
+    
+    
 }

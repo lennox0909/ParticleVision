@@ -30,7 +30,9 @@ extension ImmersiveView {
     }
     
     func updateBoxWithHandTracking() {
-        guard !isScaling,
+        // 防誤觸檢查：當鎖定透明盒子時，不進行任何手部追蹤位移與旋轉計算
+        guard simulator.isBoxInteractionEnabled,
+              !isScaling,
               let chirality = activeHand,
               let currentAnchor = latestHandAnchors[chirality],
               currentAnchor.isTracked,
@@ -45,5 +47,28 @@ extension ImmersiveView {
         
         simulator.applyInertia(oldBoxMatrix: oldMatrix, newBoxMatrix: newMatrix)
         containerBox.transform.matrix = newMatrix
+        
+        // ✨ 即時同步最新的空間座標、大小與旋轉角度至 simulator
+        simulator.boxPosition = containerBox.position
+        simulator.boxScale = containerBox.scale
+        simulator.boxOrientation = containerBox.orientation
+    }
+    
+    /// 動態啟用 / 停用 containerBox 的系統輸入判定，並清除殘留的手勢狀態
+    func updateBoxInteractability(isEnabled: Bool) {
+        if isEnabled {
+            containerBox.components.set(InputTargetComponent())
+        } else {
+            containerBox.components.remove(InputTargetComponent.self)
+            
+            // ✨ 鎖定瞬間也將當前盒子的座標與大小持久化存檔
+            simulator.saveBoxTransform(from: containerBox)
+            
+            activeHand = nil
+            initialHandTransform = nil
+            initialBoxTransform = nil
+            scaleStart = nil
+            isScaling = false
+        }
     }
 }
