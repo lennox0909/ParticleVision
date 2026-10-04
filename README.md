@@ -49,51 +49,136 @@
 
 ## 🏗️ 系統架構與 GPGPU 管線流程圖 (Architecture & Pipeline)
 
+
+
 ```mermaid
+---
+title: "粒子模擬器系統核心主架構 (Particle Simulator System Overview)"
+---
 flowchart TB
-    subgraph SwiftUI_Windows ["🖥️ SwiftUI 多視窗模組化控制台"]
-        MainUI["ContentView & ControlPanelView<br/>(規模 / 時空流速 / 邊界 / 黑洞奇點 / 容器外觀)"]
-        ColorUI["ColorSchemeView<br/>(10大色票 / 🔥熱力能階模式 / ☄️流體拉伸 / 螢光強度)"]
-        MatrixUI["MatrixSettingsView<br/>(預設集畫廊 / 自訂快照 / Forces & Radius 矩陣)"]
-    end
+    %% 定義高對比視覺樣式
+    classDef uiStyle fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    classDef arStyle fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef coreStyle fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100
+    classDef gpuStyle fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#4A148C
+    classDef renderStyle fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#880E4F
+    classDef actionStyle fill:#ECEFF1,stroke:#455A64,stroke-width:1.5px,stroke-dasharray: 4 4,color:#263238
 
-    subgraph ARKit_Audio ["🖐️ ARKit 空間感知 & 🔊 3D 聲學引擎"]
-        HandTrack["HandTrackingProvider<br/>(雙手食指與拇指骨骼追蹤)"]
-        GodHand["updateGodHandForceField()<br/>(局部座標轉換 / ✋吸引 +1.0 vs 🤏排斥 -1.0)"]
-        SpatialAudio["SpatialAudioManager<br/>(程序化合成 WAV + SpatialAudioComponent)"]
-    end
-
-    subgraph Simulator_Core ["🧠 ParticleSimulator (@Observable 核心狀態機)"]
-        SimState["Shared Buffers (UMA)<br/>particleBuffer | ruleMatrixBuffer | paramsBuffer"]
-        KineticSampler["updateLiveKineticEnergies()<br/>(每幀抽樣粒子真實速度 -> EMA 平滑熱力值)"]
-    end
-
-    subgraph Metal_GPGPU ["⚡ Metal Compute 6-Stage GPGPU Pipeline (每幀執行)"]
+    %% 頂層輸入模組
+    subgraph Input_Tier ["📥 互動與控制輸入層 (Interaction & Control Tier)"]
         direction LR
-        P1["Pass 1: clearGrid<br/>清空 32^3 空間網格"] --> P2["Pass 2: countGrid<br/>原子計數每格粒子數"]
-        P2 --> P3["Pass 3: prefixSumGrid<br/>計算網格記憶體偏移量"]
-        P3 --> P4["Pass 4: reorderParticles<br/>依空間位置重排連續記憶體"]
-        P4 --> P5["Pass 5: computeGridParticles<br/>3x3x3 鄰居查表 + 神之手 + 黑洞噴流 + 邊界"]
-        P5 --> P6["Pass 6: updateMeshVertices<br/>速度向量正交分解 -> 直寫 32-Byte 四面體頂點"]
+        SwiftUI_Mod["🖥️ SwiftUI 模組化控制台<br/>(Modular UI<br/>Consoles)"]:::uiStyle
+        ARKit_Mod["🖐️ ARKit 空間與聲學引擎<br/>(Spatial & Audio<br/>Engine)"]:::arStyle
     end
 
-    subgraph RealityKit_Render ["🥽 RealityKit 3D 沉浸式空間 (ImmersiveView)"]
-        LowMesh["LowLevelMesh (Zero-Copy)<br/>依粒子種類切分 Mesh Parts"]
-        PBRMat["Dynamic PhysicallyBasedMaterial<br/>(色票材質 / 即時熱力能階自發光更新)"]
-        VisualOrbs["3D 視覺實體<br/>12根動態邊框 + 左右手指尖光球 + 黑洞光子環"]
+    %% 核心狀態機子圖
+    subgraph Simulator_Core ["🧠 核心狀態機 (ParticleSimulator @Observable)"]
+        direction LR
+        SimState[("共享記憶體緩衝區<br/>(Shared UMA<br/>Buffers)")]:::coreStyle
+        KineticSampler["動能即時抽樣器<br/>(Live Kinetic<br/>Energy Sampler)"]:::coreStyle
     end
 
-    SwiftUI_Windows ==> SimState
-    HandTrack --> GodHand
-    GodHand ==> SimState
+    %% 獨立抽離之 GPGPU 模組節點
+    Metal_Mod[["⚡ Metal 6階段運算管線<br/>(Metal 6-Stage<br/>GPGPU Pipeline)<br/>🔍 詳見子圖 A"]]:::gpuStyle
+
+    %% 中間轉換動作節點 (取代原本過長的連線文字)
+    ZeroCopy(["UMA 零拷貝抽樣<br/>(UMA Zero-Copy<br/>Sampling)"]):::actionStyle
+    VertexWrite(["四面體頂點直寫<br/>(Direct Vertex<br/>Buffer Write)"]):::actionStyle
+
+    %% 底層渲染模組
+    RealityKit_Mod[["🥽 RealityKit 3D 沉浸空間<br/>(3D Immersive<br/>Render Space)<br/>🔍 詳見子圖 B"]]:::renderStyle
+
+    %% 系統主幹資料流
+    SwiftUI_Mod ==> SimState
+    ARKit_Mod ==> SimState
+    ARKit_Mod --> RealityKit_Mod
+    SimState ==> Metal_Mod
+    SimState --> ARKit_Mod
+
+    Metal_Mod -.-> ZeroCopy -.-> KineticSampler
+    KineticSampler --> RealityKit_Mod
+    Metal_Mod ==> VertexWrite ==> RealityKit_Mod
+```
+
+```mermaid
+---
+title: "子圖 A - Metal 6階段平行運算管線 (Sub-diagram A - Metal 6-Stage GPGPU Pipeline)"
+---
+flowchart TB
+    classDef passStyle fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#4A148C
+    classDef ioStyle fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#263238
+
+    UMA_In(["📥 接收 UMA 共享緩衝區<br/>(Input Shared<br/>UMA Buffers)"]):::ioStyle
+
+    subgraph Stage_1_to_3 ["🔄 第一階段：空間網格構建 (Phase 1 - Grid Construction)"]
+        direction LR
+        P1["Pass 1 - 清空網格<br/>(clearGrid)<br/>重置 32³ 空間網格<br/>(Reset 32³ Grid)"]:::passStyle
+        P2["Pass 2 - 原子計數<br/>(countGrid)<br/>統計每格粒子數<br/>(Atomic Particle Count)"]:::passStyle
+        P3["Pass 3 - 前綴和計算<br/>(prefixSumGrid)<br/>計算記憶體偏移量<br/>(Memory Offset Calc)"]:::passStyle
+        
+        P1 --> P2 --> P3
+    end
+
+    subgraph Stage_4_to_6 ["⚡ 第二階段：物理模擬與頂點生成 (Phase 2 - Physics & Vertex Gen)"]
+        direction LR
+        P4["Pass 4 - 粒子重排<br/>(reorderParticles)<br/>連續記憶體對齊<br/>(Contiguous Memory)"]:::passStyle
+        P5["Pass 5 - 物理力場運算<br/>(computeGridParticles)<br/>3³鄰居/神之手/黑洞<br/>(Neighbors & Forces)"]:::passStyle
+        P6["Pass 6 - 頂點正交分解<br/>(updateMeshVertices)<br/>直寫 32B 四面體頂點<br/>(Write 32B Vertices)"]:::passStyle
+
+        P4 --> P5 --> P6
+    end
+
+    Out_Sample(["📤 輸出動能抽樣<br/>(To Kinetic<br/>Sampler)"]):::ioStyle
+    Out_Mesh(["📤 輸出底層網格<br/>(To LowLevelMesh<br/>Render)"]):::ioStyle
+
+    UMA_In ==> P1
+    P3 ==> P4
+    P5 -.-> Out_Sample
+    P6 ==> Out_Mesh
+```
+
+```mermaid
+---
+title: "子圖 B - 控制台、空間感知與渲染引擎細節 (Sub-diagram B - UI, Spatial & Render Modules)"
+---
+flowchart TB
+    classDef uiStyle fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    classDef arStyle fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef renderStyle fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#880E4F
+    classDef hubStyle fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100
+
+    subgraph SwiftUI_Windows ["🖥️ SwiftUI 模組化控制台 (Modular UI Consoles)"]
+        direction LR
+        MainUI["主控制面板<br/>(ControlPanelView)<br/>規模/流速/邊界/黑洞<br/>(Scale/Time/Bounds)"]:::uiStyle
+        ColorUI["色彩與能階面板<br/>(ColorSchemeView)<br/>色票/熱力/流體拉伸<br/>(Palettes/Thermal)"]:::uiStyle
+        MatrixUI["力場矩陣設定<br/>(MatrixSettingsView)<br/>預設集/快照/作用力<br/>(Presets/Force Matrix)"]:::uiStyle
+    end
+
+    SimHub[("🧠 核心狀態與緩衝區<br/>(Simulator Core<br/>& UMA Buffers)")]:::hubStyle
+
+    subgraph ARKit_Audio ["🖐️ ARKit 空間與聲學 (Spatial & 3D Audio)"]
+        direction TB
+        HandTrack["手部骨骼追蹤<br/>(HandTrackingProvider)<br/>雙手食指與拇指追蹤<br/>(Index & Thumb Track)"]:::arStyle
+        GodHand["神之手力場更新<br/>(updateGodHandForce)<br/>✋吸引+1 / 🤏排斥-1<br/>(Attract / Repel)"]:::arStyle
+        SpatialAudio["3D 空間音效管理<br/>(SpatialAudioManager)<br/>程序化合成 WAV 聲學<br/>(Procedural WAV)"]:::arStyle
+        
+        HandTrack --> GodHand
+    end
+
+    subgraph RealityKit_Render ["🥽 RealityKit 3D 沉浸空間 (ImmersiveView)"]
+        direction TB
+        LowMesh["零拷貝底層網格<br/>(LowLevelMesh)<br/>依粒子種類切分部件<br/>(Split Mesh Parts)"]:::renderStyle
+        PBRMat["動態物理材質<br/>(Dynamic PBR Material)<br/>即時熱力自發光更新<br/>(Live Thermal Emissive)"]:::renderStyle
+        VisualOrbs["3D 視覺實體物件<br/>(3D Visual Entities)<br/>動態邊框/指尖光球/光子環<br/>(Bounds/Orbs/Photon Ring)"]:::renderStyle
+    end
+
+    %% 跨模組關聯
+    MainUI & ColorUI & MatrixUI ==> SimHub
+    GodHand ==> SimHub
+    SimHub --> SpatialAudio
     GodHand --> VisualOrbs
-    SimState --> SpatialAudio
-    SimState ==> Metal_GPGPU
-    P5 -. "UMA Zero-Copy 抽樣" .-> KineticSampler
-    KineticSampler --> PBRMat
-    P6 ==> LowMesh
-    LowMesh --> RealityKit_Render
-    PBRMat --> RealityKit_Render
+    SimHub -.-> PBRMat
+    SimHub ==> LowMesh
 ```
 
 ---
