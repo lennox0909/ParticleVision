@@ -21,6 +21,10 @@ struct ImmersiveView: View {
     @State var scaleStart: SIMD3<Float>?
     
     @State var isScaling: Bool = false
+    
+    // ✨ 新增：左右手食指尖的 3D 能量光球視覺指示器
+    @State var leftHandOrb = ModelEntity()
+    @State var rightHandOrb = ModelEntity()
 
     var body: some View {
         RealityView { content in
@@ -69,6 +73,7 @@ struct ImmersiveView: View {
                 
                 simulator.updateFPS()
                 updateBoxWithHandTracking()
+                updateGodHandForceField() // ✨ 每幀更新雙手食指尖力場座標與光球特效
                 simulator.updateSimulation()
                 syncParticlesToVisuals()
             }
@@ -134,7 +139,7 @@ struct ImmersiveView: View {
         .onDisappear {
             // ✨ 當點擊「關閉 3D 粒子空間」時，立即將當前盒子的最終大小、座標與旋轉角度完整儲存
             simulator.saveBoxTransform(from: containerBox)
-            
+            simulator.handForces = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
             frameSubscription?.cancel()
             frameSubscription = nil
             simulator.resetFPS()
