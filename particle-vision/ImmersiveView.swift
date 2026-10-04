@@ -120,6 +120,15 @@ struct ImmersiveView: View {
         .onChange(of: simulator.currentColors) { _, _ in
             updateParticleMaterials()
         }
+        // ✨ 當切換「熱力能量著色模式」或矩陣規則變動時，即時更新熱力能階材質
+        .onChange(of: simulator.isKineticColorMode) { _, _ in
+            updateParticleMaterials()
+        }
+        .onChange(of: simulator.ruleMatrix) { _, _ in
+            if simulator.isKineticColorMode {
+                updateParticleMaterials()
+            }
+        }
         .onChange(of: simulator.isBoxInteractionEnabled) { _, isEnabled in
             updateBoxInteractability(isEnabled: isEnabled)
         }

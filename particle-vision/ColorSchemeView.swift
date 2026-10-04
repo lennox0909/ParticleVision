@@ -23,17 +23,19 @@ struct ColorSchemeView: View {
         @Bindable var bindableSimulator = simulator
         let count = simulator.numTypes
         
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             
             // MARK: - 1. 標題列與 ⓘ 說明氣泡 + 重新骰色按鈕
-            HStack(spacing: 8) {
-                Image(systemName: "paintpalette.fill")
-                    .font(.title2)
-                    .foregroundStyle(.cyan)
+            HStack(spacing: 6) {
+                Image(systemName: simulator.isKineticColorMode ? "flame.fill" : "paintpalette.fill")
+                    .font(.title3)
+                    .foregroundStyle(simulator.isKineticColorMode ? .orange : .cyan)
+                    .contentTransition(.symbolEffect(.replace))
                 
                 Text("Color Scheme")
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.bold)
+                    .lineLimit(1)
                 
                 Button {
                     showHelpPopover.toggle()
@@ -41,22 +43,22 @@ struct ColorSchemeView: View {
                     Image(systemName: "info.circle")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .padding(4)
+                        .padding(2)
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showHelpPopover, arrowEdge: .top) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("轉動滾輪即可即時切換色票。")
+                        Text("🎨 色票與動能視覺指南")
                             .font(.callout.bold())
-                        Text("**Static** 為固定漸層；**Generative** 與 **Experimental** 每次選中或點擊骰子都會生成全新的主題變體。")
+                        Text("• **種類色票模式**：依下方滾輪選取的色票為各粒子種類上色。\n• **🔥 熱力能階模式**：依各粒子群的活躍度自動映射為「深海冷藍 ➔ 烈焰橘紅」熱力漸層。\n• **☄️ 流體速度拉伸**：高速運動的粒子會沿速度方向自動拉伸為彗星光梭。")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                     .padding(18)
-                    .frame(width: 290)
+                    .frame(width: 310)
                 }
                 
-                Spacer()
+                Spacer(minLength: 4)
                 
                 Button {
                     simulator.applyPalette(id: simulator.selectedPaletteID)
@@ -70,22 +72,33 @@ struct ColorSchemeView: View {
                 .buttonStyle(.bordered)
                 .tint(.cyan)
                 .controlSize(.small)
+                .disabled(simulator.isKineticColorMode)
                 .help("重新生成當前色票變化")
             }
             
-            // MARK: - 2. 當前啟用的粒子色票預覽列 + 粒子大小與螢光強度控制
-            VStack(alignment: .leading, spacing: 10) {
-                // 色票圓點預覽
-                VStack(alignment: .leading, spacing: 6) {
+            // MARK: - 2. 著色模式切換 + 粒子外觀與動能拉伸控制 (緊湊化排版)
+            VStack(alignment: .leading, spacing: 8) {
+                
+                // 種類色票 vs 熱力能量模式 Segmented 切換器
+                Picker("著色模式", selection: $bindableSimulator.isKineticColorMode) {
+                    Text("🎨 種類色票").tag(false)
+                    Text("🔥 熱力能階").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                
+                // 色票圓點預覽（或熱力光譜預覽）
+                VStack(alignment: .leading, spacing: 5) {
                     HStack {
-                        Text("目前套用色票:")
+                        Text(simulator.isKineticColorMode ? "熱力光譜 (低能 ➔ 高能):" : "目前套用色票:")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(currentPalette?.name ?? "Rainbow")
+                        Text(simulator.isKineticColorMode ? "Thermal Plasma" : (currentPalette?.name ?? "Rainbow"))
                             .font(.caption.bold())
-                            .foregroundStyle(.cyan)
+                            .foregroundStyle(simulator.isKineticColorMode ? .orange : .cyan)
+                            .lineLimit(1)
                         Spacer()
-                        Text(currentPalette?.category.uppercased() ?? "STATIC")
+                        Text(simulator.isKineticColorMode ? "KINETIC" : (currentPalette?.category.uppercased() ?? "STATIC"))
                             .font(.caption2.weight(.bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -93,16 +106,47 @@ struct ColorSchemeView: View {
                             .foregroundStyle(.secondary)
                     }
                     
-                    HStack(spacing: 10) {
-                        ForEach(0..<count, id: \.self) { typeIdx in
-                            Circle()
-                                .fill(simulator.colorForType(typeIdx))
-                                .frame(width: 24, height: 24)
-                                .overlay(
-                                    Circle().stroke(Color.white.opacity(0.4), lineWidth: 1)
-                                )
+                    if simulator.isKineticColorMode {
+                        // 顯示連續熱力漸層條 + 各粒子群即時真實動能游標
+                        ZStack(alignment: .leading) {
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.04, green: 0.12, blue: 0.48),
+                                    .cyan,
+                                    .green,
+                                    .yellow,
+                                    .red
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(height: 20)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
+                            
+                            // 即時標示目前最高動能位置
+                            GeometryReader { geo in
+                                let maxEnergy = simulator.typeKineticEnergies.prefix(count).max() ?? 0.0
+                                Circle()
+                                    .fill(.white)
+                                    .frame(width: 14, height: 14)
+                                    .shadow(color: .black.opacity(0.6), radius: 2)
+                                    .offset(x: max(3, min(geo.size.width - 17, CGFloat(maxEnergy) * (geo.size.width - 14))), y: 3)
+                            }
                         }
-                        Spacer()
+                        .frame(height: 20)
+                    } else {
+                        HStack(spacing: 8) {
+                            ForEach(0..<count, id: \.self) { typeIdx in
+                                Circle()
+                                    .fill(simulator.colorForType(typeIdx))
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        Circle().stroke(Color.white.opacity(0.4), lineWidth: 1)
+                                    )
+                            }
+                            Spacer()
+                        }
                     }
                 }
                 
@@ -110,32 +154,49 @@ struct ColorSchemeView: View {
                     .overlay(Color.white.opacity(0.15))
                 
                 // 控制項 1：粒子大小
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("粒子大小")
-                            .font(.subheadline.weight(.medium))
+                            .font(.caption.weight(.medium))
                         Spacer()
                         Text(String(format: "%.3f", simulator.particleScale))
-                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .font(.system(.caption, design: .monospaced).bold())
                             .foregroundStyle(.secondary)
                     }
                     Slider(value: $bindableSimulator.particleScale, in: 0.005...0.050, step: 0.001)
+                        .controlSize(.small)
                 }
                 
-                // 控制項 2：螢光強度
-                VStack(alignment: .leading, spacing: 4) {
+                // 控制項 2：流體速度拉伸 (Velocity Stretch)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Label("流體速度拉伸 (彗星尾跡)", systemImage: "wind")
+                            .font(.caption.weight(.medium))
+                        Spacer()
+                        Text(simulator.velocityStretch == 0 ? "關閉" : String(format: "%.1fx", simulator.velocityStretch))
+                            .font(.system(.caption, design: .monospaced).bold())
+                            .foregroundStyle(simulator.velocityStretch > 0 ? .orange : .secondary)
+                    }
+                    Slider(value: $bindableSimulator.velocityStretch, in: 0.0...5.0, step: 0.1)
+                        .tint(.orange)
+                        .controlSize(.small)
+                }
+                
+                // 控制項 3：螢光強度
+                VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("螢光強度")
-                            .font(.subheadline.weight(.medium))
+                            .font(.caption.weight(.medium))
                         Spacer()
                         Text(String(format: "%.1f", simulator.glowIntensity))
-                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .font(.system(.caption, design: .monospaced).bold())
                             .foregroundStyle(simulator.glowIntensity > 0 ? .cyan : .secondary)
                     }
                     
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.1)
                             .tint(.cyan)
+                            .controlSize(.small)
                         
                         Button {
                             let next = max(0, simulator.glowIntensity - 0.1)
@@ -145,7 +206,7 @@ struct ColorSchemeView: View {
                         }
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.circle)
-                        .controlSize(.small)
+                        .controlSize(.mini)
                         
                         Button {
                             let next = min(5, simulator.glowIntensity + 0.1)
@@ -155,52 +216,48 @@ struct ColorSchemeView: View {
                         }
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.circle)
-                        .controlSize(.small)
+                        .controlSize(.mini)
                     }
                 }
             }
-            .padding(14)
+            .padding(12)
             .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 14))
-            .fixedSize(horizontal: false, vertical: true)
             
-            // MARK: - 3. ✨ 分類選單 (修正壓縮與點選問題) + 3D 滾輪色票選擇器
-            VStack(alignment: .leading, spacing: 10) {
-                // 改用 visionOS 原生 Segmented Picker，並鎖定高度與優先層級 (zIndex)，防止被壓縮或被滾輪遮擋
+            // MARK: - 3. 分類選單 + 3D 滾輪色票選擇器
+            VStack(alignment: .leading, spacing: 8) {
                 Picker("Category", selection: $selectedCategory) {
-                    ForEach(categoryTabs, id: \.self) { cat in
-                        Text(cat).tag(cat)
-                    }
+                    Text("All").tag("All")
+                    Text("Static").tag("Static")
+                    Text("Gen").tag("Generative")
+                    Text("Exp").tag("Experimental")
                 }
                 .pickerStyle(.segmented)
-                .frame(height: 36)
-                .fixedSize(horizontal: false, vertical: true)
+                .controlSize(.small)
                 .zIndex(1)
                 .onChange(of: selectedCategory) { _, _ in
-                    // 切換分類時，若當前色票不在該分類內，自動跳至該分類第一個色票並立即套用
                     if let firstInCat = filteredPalettes.first,
                        !filteredPalettes.contains(where: { $0.id == simulator.selectedPaletteID }) {
                         simulator.applyPalette(id: firstInCat.id)
                     }
                 }
                 
-                // 3D 滾輪選單：固定高度 190pt，並限制觸控區域不超出外框
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.cyan.opacity(0.55), lineWidth: 1.5)
                         .fill(Color.cyan.opacity(0.10))
-                        .frame(height: 38)
+                        .frame(height: 34)
                         .padding(.horizontal, 10)
                         .allowsHitTesting(false)
                     
                     Picker("Color Palette", selection: $bindableSimulator.selectedPaletteID) {
                         ForEach(filteredPalettes) { option in
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
                                 Text(option.name)
-                                    .font(.headline)
+                                    .font(.subheadline.weight(.semibold))
                                 
                                 if option.category != "Static" && option.category != "Default" {
                                     Image(systemName: "sparkles")
-                                        .font(.caption)
+                                        .font(.caption2)
                                         .foregroundStyle(.cyan)
                                 }
                             }
@@ -210,21 +267,22 @@ struct ColorSchemeView: View {
                     .pickerStyle(.wheel)
                     .labelsHidden()
                     .frame(maxWidth: .infinity)
-                    .frame(height: 190)
+                    .frame(height: 135)
                     .clipped()
                     .contentShape(Rectangle())
                     .onChange(of: simulator.selectedPaletteID) { _, newID in
+                        simulator.isKineticColorMode = false // 轉動色票滾輪時自動切回色票模式
                         simulator.applyPalette(id: newID)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 190)
-                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
+                .frame(height: 135)
+                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 14))
+                .opacity(simulator.isKineticColorMode ? 0.5 : 1.0)
             }
-            
-            Spacer(minLength: 0)
         }
-        .padding(24)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .onAppear {
             if !simulator.showColorWindow {
                 openWindow(id: "MainControlWindow")

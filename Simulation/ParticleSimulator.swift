@@ -75,6 +75,59 @@ class ParticleSimulator {
     // 👇 粒子大小的預設值在這裡 (範圍 0.005 ~ 0.050) 只負責控制 3D 視覺外觀大小，與物理半徑完全解耦
     var particleScale: Float = 0.005
     
+    // ✨ 新增：動能流體拉伸強度 (0.0 = 維持原狀, 1.0 ~ 5.0 = 依速度向量自動拉長為彗星光梭)
+    var velocityStretch: Float = 2.0
+    
+    // ✨ 是否啟用「熱力能量著色模式 (Kinetic Heatmap Mode)」
+    var isKineticColorMode: Bool = false
+    
+    // ✨ 新增：各種類粒子的「即時真實動能測速值 (0.0 極冷靜止 ~ 1.0 極熱高速)」
+    var typeKineticEnergies: [Float] = Array(repeating: 0.0, count: 8)
+    
+    /// ✨ 從 GPU 共享的 particleBuffer 即時抽樣計算各種類粒子的真實運動速度
+    func updateLiveKineticEnergies() {
+        guard isKineticColorMode,
+              let buffer = particleBuffer,
+              numTypes > 0,
+              particleCount > 0 else { return }
+        
+        let ptr = buffer.contents().bindMemory(to: Particle.self, capacity: particleCount)
+        let particlesPerType = max(1, particleCount / numTypes)
+        let sampleCount = min(256, particlesPerType) // 每種粒子均勻抽樣 256 顆，耗時不到 0.05ms！
+        let step = max(1, particlesPerType / sampleCount)
+        
+        // 在此物理系統中，jitter 靜止微幅震動約為 0.015，高速追擊或神之手加速約為 0.18 ~ 0.45
+        let idleSpeedFloor: Float = 0.018
+        let maxRefSpeed: Float = 0.28
+        
+        var newEnergies = [Float](repeating: 0.0, count: numTypes)
+        
+        for t in 0..<numTypes {
+            let startIdx = t * particlesPerType
+            var totalSpeed: Float = 0.0
+            var count: Int = 0
+            
+            var idx = startIdx
+            let endIdx = min(particleCount, startIdx + particlesPerType)
+            while idx < endIdx {
+                let v = ptr[idx].velocity
+                totalSpeed += simd_length(v)
+                count += 1
+                idx += step
+            }
+            
+            let avgSpeed = count > 0 ? (totalSpeed / Float(count)) : 0.0
+            // 扣除基礎微擾動 (jitter)，將真實移動速度正規化至 0.0 (靜止深藍) ~ 1.0 (高速白熱紅)
+            let normalized = max(0.0, min(1.0, (avgSpeed - idleSpeedFloor) / (maxRefSpeed - idleSpeedFloor)))
+            
+            // 與上一幀進行指數平滑 (EMA)，讓顏色隨速度升溫/冷卻過渡極度絲滑不閃爍
+            let prev = t < typeKineticEnergies.count ? typeKineticEnergies[t] : 0.0
+            newEnergies[t] = prev * 0.82 + normalized * 0.18
+        }
+        
+        self.typeKineticEnergies = newEnergies
+    }
+    
     // 空間摩擦力預設值
     var friction: Float = 0.65 {
         didSet {
