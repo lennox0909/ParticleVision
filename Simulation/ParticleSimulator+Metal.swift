@@ -176,58 +176,66 @@ extension ParticleSimulator {
               let computeEncoder = commandBuffer.makeComputeCommandEncoder(),
               let mesh = lowLevelMesh else { return }
         
-        let numCells = 32768
         var w = clearGridPipeline.maxTotalThreadsPerThreadgroup
         
-        computeEncoder.setComputePipelineState(clearGridPipeline)
-        computeEncoder.setBuffer(gridBuffer, offset: 0, index: 0)
-        computeEncoder.dispatchThreadgroups(MTLSize(width: (numCells + w - 1) / w, height: 1, depth: 1),
-                                            threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
-        computeEncoder.memoryBarrier(scope: .buffers)
+        // ✨ 只有在「未暫停」且「時間流速 > 0」時，才執行物理碰撞與座標更新
+        // 暫停時保留粒子當下的真實速度向量，讓「彗星光梭拉伸」與「熱力色彩」完美定格在空中供微距觀察！
+        if !isPaused && timeScale > 0.001 {
+            let numCells = 32768
+            
+            computeEncoder.setComputePipelineState(clearGridPipeline)
+            computeEncoder.setBuffer(gridBuffer, offset: 0, index: 0)
+            computeEncoder.dispatchThreadgroups(MTLSize(width: (numCells + w - 1) / w, height: 1, depth: 1),
+                                                threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+            computeEncoder.memoryBarrier(scope: .buffers)
+            
+            w = countGridPipeline.maxTotalThreadsPerThreadgroup
+            computeEncoder.setComputePipelineState(countGridPipeline)
+            computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
+            computeEncoder.setBuffer(gridBuffer, offset: 0, index: 1)
+            computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 2)
+            computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
+                                                threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+            computeEncoder.memoryBarrier(scope: .buffers)
+            
+            computeEncoder.setComputePipelineState(prefixSumPipeline)
+            computeEncoder.setBuffer(gridBuffer, offset: 0, index: 0)
+            computeEncoder.dispatchThreadgroups(MTLSize(width: 1, height: 1, depth: 1),
+                                                threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+            computeEncoder.memoryBarrier(scope: .buffers)
+            
+            w = reorderPipeline.maxTotalThreadsPerThreadgroup
+            computeEncoder.setComputePipelineState(reorderPipeline)
+            computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
+            computeEncoder.setBuffer(sortedParticleBuffer, offset: 0, index: 1)
+            computeEncoder.setBuffer(gridBuffer, offset: 0, index: 2)
+            computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 3)
+            computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
+                                                threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+            computeEncoder.memoryBarrier(scope: .buffers)
+            
+            w = computeGridPipeline.maxTotalThreadsPerThreadgroup
+            computeEncoder.setComputePipelineState(computeGridPipeline)
+            computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
+            computeEncoder.setBuffer(sortedParticleBuffer, offset: 0, index: 1)
+            computeEncoder.setBuffer(ruleMatrixBuffer, offset: 0, index: 2)
+            computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 3)
+            computeEncoder.setBuffer(gridBuffer, offset: 0, index: 4)
+            
+            // 傳入左右手「神之手」力場座標與狀態至 buffer(5)
+            var currentHandForces = self.handForces
+            computeEncoder.setBytes(&currentHandForces, length: MemoryLayout<SIMD4<Float>>.stride * 2, index: 5)
+            
+            // ✨ 新增：傳入宇宙邊界物理模式至 buffer(6) (0 = 彈性撈網 Bounce, 1 = 無縫環形穿越 Wrap-around)
+            var boundaryMode: UInt32 = self.isWrapBoundary ? 1 : 0
+            computeEncoder.setBytes(&boundaryMode, length: MemoryLayout<UInt32>.stride, index: 6)
+            
+            computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
+                                                threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+            computeEncoder.memoryBarrier(scope: .buffers)
+        }
         
-        w = countGridPipeline.maxTotalThreadsPerThreadgroup
-        computeEncoder.setComputePipelineState(countGridPipeline)
-        computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
-        computeEncoder.setBuffer(gridBuffer, offset: 0, index: 1)
-        computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 2)
-        computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
-                                            threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
-        computeEncoder.memoryBarrier(scope: .buffers)
-        
-        computeEncoder.setComputePipelineState(prefixSumPipeline)
-        computeEncoder.setBuffer(gridBuffer, offset: 0, index: 0)
-        computeEncoder.dispatchThreadgroups(MTLSize(width: 1, height: 1, depth: 1),
-                                            threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-        computeEncoder.memoryBarrier(scope: .buffers)
-        
-        w = reorderPipeline.maxTotalThreadsPerThreadgroup
-        computeEncoder.setComputePipelineState(reorderPipeline)
-        computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
-        computeEncoder.setBuffer(sortedParticleBuffer, offset: 0, index: 1)
-        computeEncoder.setBuffer(gridBuffer, offset: 0, index: 2)
-        computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 3)
-        computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
-                                            threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
-        computeEncoder.memoryBarrier(scope: .buffers)
-        
-        w = computeGridPipeline.maxTotalThreadsPerThreadgroup
-        computeEncoder.setComputePipelineState(computeGridPipeline)
-        computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
-        computeEncoder.setBuffer(sortedParticleBuffer, offset: 0, index: 1)
-        computeEncoder.setBuffer(ruleMatrixBuffer, offset: 0, index: 2)
-        computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 3)
-        computeEncoder.setBuffer(gridBuffer, offset: 0, index: 4)
-        
-        // ✨ 新增：將左右手「神之手」力場座標與狀態傳入 buffer(5)
-        var currentHandForces = self.handForces
-        computeEncoder.setBytes(&currentHandForces, length: MemoryLayout<SIMD4<Float>>.stride * 2, index: 5)
-        
-        computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
-                                            threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
-        // ✨ 確保粒子座標寫入完畢後，再執行下方的頂點網格更新
-        computeEncoder.memoryBarrier(scope: .buffers)
-        
-        // ✨ 更新 GPU 頂點網格，將 (particleScale, velocityStretch) 打包為 SIMD2<Float> 傳入 buffer(3)
+        // 更新 GPU 頂點網格（即使在時間暫停時也會執行，讓使用者在凍結瞬間仍可即時調整粒子大小與彗星尾跡滑桿）
         let currentVertexBuffer = mesh.replace(bufferIndex: 0, using: commandBuffer)
         var meshVisualParams = SIMD2<Float>(self.particleScale, self.velocityStretch)
         w = updateMeshPipeline.maxTotalThreadsPerThreadgroup
@@ -238,8 +246,6 @@ extension ParticleSimulator {
         computeEncoder.setBytes(&meshVisualParams, length: MemoryLayout<SIMD2<Float>>.stride, index: 3)
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
-        
-        
         
         computeEncoder.endEncoding()
         commandBuffer.commit()
