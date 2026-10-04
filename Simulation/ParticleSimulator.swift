@@ -31,6 +31,13 @@ class ParticleSimulator {
     // ✨ 新增：宇宙邊界物理模式 (false = 📦 彈性撈網邊界 Bounce, true = ♾️ 無縫週期穿越 Wrap-around)
     var isWrapBoundary: Bool = false
     
+    // ✨ 新增：3D 空間環境音效與指尖力場聲學回饋靜音開關
+    var isAudioMuted: Bool = UserDefaults.standard.bool(forKey: "IsAudioMuted") {
+        didSet {
+            UserDefaults.standard.set(isAudioMuted, forKey: "IsAudioMuted")
+        }
+    }
+    
     // ✨ 左右手「神之手」力場資料 [左手, 右手]（加上 @ObservationIgnored 避免每幀觸發 UI 重繪與巨集歧義）
     @ObservationIgnored
     var handForces: [SIMD4<Float>] = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
