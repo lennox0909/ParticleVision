@@ -178,20 +178,49 @@ constant float3 tetraVerts[4] = {
     float3(-1.0, -1.0,  1.0) * 0.57735f
 };
 
-// ✨ 接收 buffer(3) 傳入的 particleScale，讓粒子外觀大小滑桿獨立生效
+// ✨ 接收 buffer(3) 傳入的 meshVisualParams (x: particleScale, y: velocityStretch)
+// 當粒子高速移動時，沿著速度方向 (velDir) 自動拉伸成流線型彗星光梭！
 kernel void updateMeshVertices(device const Particle* particles [[buffer(0)]],
                                device ParticleVertex* vertices [[buffer(1)]],
                                constant SimParams& params [[buffer(2)]],
-                               constant float& particleScale [[buffer(3)]],
+                               constant float2& meshVisualParams [[buffer(3)]],
                                uint id [[thread_position_in_grid]]) {
     if (id >= params.particleCount) return;
     
     Particle p = particles[id];
     uint vIndex = p.originalIndex * 4;
-    float size = particleScale;
-
-    for (int i = 0; i < 4; i++) {
-        vertices[vIndex + i].position = p.position + tetraVerts[i] * size;
-        vertices[vIndex + i].normal = tetraVerts[i];
+    
+    float baseSize = meshVisualParams.x;
+    float stretchStrength = meshVisualParams.y;
+    
+    float speed = fast::length(p.velocity);
+    
+    // 當開啟流體拉伸 (stretchStrength > 0) 且粒子具有明顯速度時，進行沿速度方向的流體拉伸
+    if (stretchStrength > 0.001f && speed > 0.005f) {
+        float3 velDir = p.velocity / speed;
+        
+        // 計算拉伸倍率（最高可拉長至 6.5 倍，高速追擊或神之手吸引時會形成鮮明光梭軌跡）
+        float stretchFactor = 1.0f + min(speed * stretchStrength * 3.8f, 5.5f);
+        // 側向略微收窄 (0.75 ~ 1.0)，讓高速粒子呈現銳利的流線梭形而非單純變胖
+        float thicknessFactor = max(0.72f, 1.0f / sqrt(stretchFactor));
+        
+        for (int i = 0; i < 4; i++) {
+            float3 v = tetraVerts[i];
+            // 將頂點向量分解為「平行於速度方向」與「垂直於速度方向」兩個分量
+            float parallelProj = dot(v, velDir);
+            float3 vParallel = velDir * parallelProj;
+            float3 vPerp = v - vParallel;
+            
+            // 平行方向隨動能拉長，垂直方向微幅收束
+            float3 deformedOffset = (vPerp * thicknessFactor + vParallel * stretchFactor) * baseSize;
+            
+            vertices[vIndex + i].position = p.position + deformedOffset;
+            vertices[vIndex + i].normal = normalize(vPerp + vParallel / stretchFactor);
+        }
+    } else {
+        for (int i = 0; i < 4; i++) {
+            vertices[vIndex + i].position = p.position + tetraVerts[i] * baseSize;
+            vertices[vIndex + i].normal = tetraVerts[i];
+        }
     }
 }

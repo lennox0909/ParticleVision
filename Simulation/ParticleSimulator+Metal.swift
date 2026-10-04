@@ -73,7 +73,7 @@ extension ParticleSimulator {
         
         setupMesh()
     }
-        
+    
     func setupMesh() {
         var descriptor = LowLevelMesh.Descriptor()
         
@@ -227,17 +227,19 @@ extension ParticleSimulator {
         // ✨ 確保粒子座標寫入完畢後，再執行下方的頂點網格更新
         computeEncoder.memoryBarrier(scope: .buffers)
         
-        // 更新 GPU 頂點網格，並將 particleScale 傳入 buffer(3) 即時控制粒子視覺大小
+        // ✨ 更新 GPU 頂點網格，將 (particleScale, velocityStretch) 打包為 SIMD2<Float> 傳入 buffer(3)
         let currentVertexBuffer = mesh.replace(bufferIndex: 0, using: commandBuffer)
-        var currentScale = self.particleScale
+        var meshVisualParams = SIMD2<Float>(self.particleScale, self.velocityStretch)
         w = updateMeshPipeline.maxTotalThreadsPerThreadgroup
         computeEncoder.setComputePipelineState(updateMeshPipeline)
         computeEncoder.setBuffer(particleBuffer, offset: 0, index: 0)
         computeEncoder.setBuffer(currentVertexBuffer, offset: 0, index: 1)
         computeEncoder.setBuffer(paramsBuffer, offset: 0, index: 2)
-        computeEncoder.setBytes(&currentScale, length: MemoryLayout<Float>.stride, index: 3)
+        computeEncoder.setBytes(&meshVisualParams, length: MemoryLayout<SIMD2<Float>>.stride, index: 3)
         computeEncoder.dispatchThreadgroups(MTLSize(width: (particleCount + w - 1) / w, height: 1, depth: 1),
                                             threadsPerThreadgroup: MTLSize(width: w, height: 1, depth: 1))
+        
+        
         
         computeEncoder.endEncoding()
         commandBuffer.commit()
