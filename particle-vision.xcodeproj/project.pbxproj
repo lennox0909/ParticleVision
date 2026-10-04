@@ -10,6 +10,7 @@
 		B84CBC4A3072135500417D86 /* SimulationPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84CBC493072135500417D86 /* SimulationPreset.swift */; };
 		B84CBC4C3072142600417D86 /* ParticleSimulator+Presets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84CBC4B3072142600417D86 /* ParticleSimulator+Presets.swift */; };
 		B84CBC4E30723E4F00417D86 /* SpatialAudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84CBC4D30723E4F00417D86 /* SpatialAudioManager.swift */; };
+		B84CBCC4307247A700417D86 /* NOTE.md in Resources */ = {isa = PBXBuildFile; fileRef = B84CBCC3307247A700417D86 /* NOTE.md */; };
 		B8BB3E8E3068F184005EE1A3 /* SimulationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E8D3068F184005EE1A3 /* SimulationModels.swift */; };
 		B8BB3E903068F1C2005EE1A3 /* ParticleSimulator+Metal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E8F3068F1C2005EE1A3 /* ParticleSimulator+Metal.swift */; };
 		B8BB3E943068F358005EE1A3 /* GridSorting.metal in Sources */ = {isa = PBXBuildFile; fileRef = B8BB3E933068F358005EE1A3 /* GridSorting.metal */; };
@@ -33,6 +34,7 @@
 		B84CBC493072135500417D86 /* SimulationPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationPreset.swift; sourceTree = "<group>"; };
 		B84CBC4B3072142600417D86 /* ParticleSimulator+Presets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParticleSimulator+Presets.swift"; sourceTree = "<group>"; };
 		B84CBC4D30723E4F00417D86 /* SpatialAudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAudioManager.swift; sourceTree = "<group>"; };
+		B84CBCC3307247A700417D86 /* NOTE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = NOTE.md; sourceTree = "<group>"; };
 		B8BB3E8D3068F184005EE1A3 /* SimulationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationModels.swift; sourceTree = "<group>"; };
 		B8BB3E8F3068F1C2005EE1A3 /* ParticleSimulator+Metal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParticleSimulator+Metal.swift"; sourceTree = "<group>"; };
 		B8BB3E923068F32B005EE1A3 /* ParticleTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ParticleTypes.h; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 		B8E2D81B305F9780005944C0 = {
 			isa = PBXGroup;
 			children = (
+				B84CBCC3307247A700417D86 /* NOTE.md */,
 				B82D5DE930615645008C7558 /* README.md */,
 				B8E2D84E305F97E5005944C0 /* Simulation */,
 				B8E2D826305F9780005944C0 /* particle-vision */,
@@ -210,6 +213,7 @@
 		B8E2D822305F9780005944C0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				B84CBCC4307247A700417D86 /* NOTE.md in Resources */,
 			);
 		};
 		B8E2D839305F9781005944C0 /* Resources */ = {
