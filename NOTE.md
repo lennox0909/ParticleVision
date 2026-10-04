@@ -100,13 +100,14 @@ flowchart TB
 
 在每次 SceneEvents.Update 幀迴圈中（當未處於時間凍結狀態時），ParticleSimulator+Metal.swift 會在單一 MTLCommandBuffer 與 MTLComputeCommandEncoder 中依序派發以下 6 個 Compute Kernels，並以 memoryBarrier(scope: .buffers) 確保資料一致性：
 
-階段,Kernel 名稱,執行緒規模,核心演算法說明
-Pass 1,clearGrid,"32,768 (網格數)",將 32×32×32 空間網格（gridBuffer）的 count 與 startIndex 歸零。
-Pass 2,countGrid,particleCount,將每顆粒子座標 (−2.0∼+2.0) 量化映射至對應網格索引，並以 atomic_fetch_add_explicit 統計每格粒子總數。
-Pass 3,prefixSumGrid,1 (序列前綴和),"對 32,768 個網格執行 Prefix Sum（前綴和），算出每個網格在 sortedParticleBuffer 中的起始指標 startIndex。"
-Pass 4,reorderParticles,particleCount,將散亂的粒子依所屬網格搬移至連續排列的 sortedParticleBuffer，使空間上相鄰的粒子在 GPU 快取（Cache Line）中也緊密相鄰。
-Pass 5,computeGridParticles,particleCount,遍歷周圍 3×3×3=27 個鄰近網格（支援 Modulo 32 環形折返），查表計算 (p.type -> other.type) 的專屬斥力與引力，疊加 PCG Hash 微擾動、雙手神之手力場（buffer(5)）、中心黑洞奇點與雙極噴流（buffer(7)），最後執行時間補償阻尼與邊界碰撞（buffer(6)），並依 originalIndex 寫回原始位址。
-Pass 6,updateMeshVertices,particleCount,"讀取粒子最新座標與速度向量，建立以速度方向 f^​ 為軸的正交基底 (f^​,r^,u^)，依速率與 velocityStretch 倍率拉伸正四面體的 4 個頂點與法向量，直接寫入 LowLevelMesh 緩衝區。"
+| 階段 | Kernel 名稱 | 執行緒規模 | 核心演算法說明 |
+| :--- | :--- | :--- | :--- |
+| **Pass 1** | `clearGrid` | 32,768 (網格數) | 將 32×32×32 空間網格（`gridBuffer`）的 `count` 與 `startIndex` 歸零。 |
+| **Pass 2** | `countGrid` | `particleCount` | 將每顆粒子座標 (-2.0 ~ +2.0) 量化映射至對應網格索引，並以 `atomic_fetch_add_explicit` 統計每格粒子總數。 |
+| **Pass 3** | `prefixSumGrid` | 1 (序列前綴和) | 對 32,768 個網格執行 Prefix Sum（前綴和），算出每個網格在 `sortedParticleBuffer` 中的起始指標 `startIndex`。 |
+| **Pass 4** | `reorderParticles` | `particleCount` | 將散亂的粒子依所屬網格搬移至連續排列的 `sortedParticleBuffer`，使空間上相鄰的粒子在 GPU 快取（Cache Line）中也緊密相鄰。 |
+| **Pass 5** | `computeGridParticles` | `particleCount` | 遍歷周圍 3×3×3=27 個鄰近網格（支援 Modulo 32 環形折返），查表計算 `(p.type -> other.type)` 的專屬斥力與引力，疊加 PCG Hash 微擾動、雙手神之手力場（`buffer(5)`）、中心黑洞奇點與雙極噴流（`buffer(7)`），最後執行時間補償阻尼與邊界碰撞（`buffer(6)`），並依 `originalIndex` 寫回原始位址。 |
+| **Pass 6** | `updateMeshVertices` | `particleCount` | 讀取粒子最新座標與速度向量，建立以速度方向 $\hat{f}$ 為軸的正交基底 $(\hat{f}, \hat{r}, \hat{u})$，依速率與 `velocityStretch` 倍率拉伸正四面體的 4 個頂點與法向量，直接寫入 `LowLevelMesh` 緩衝區。 |
 
 ## 🎮 空間操作指南 (User Guide)
 1. 啟動宇宙：在主控制台點擊底部的 「啟動 3D 粒子空間」，前方將浮現裝載 50,000 顆發光粒子的透明宇宙盒。
