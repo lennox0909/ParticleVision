@@ -33,7 +33,7 @@
 * **GPU 速度向量正交拉伸（Velocity Stretch）**：在 `updateMeshVertices` Kernel 中將四面體頂點沿運動方向單位向量 $\hat{v}$ 進行正交分解與動態延伸，使高速粒子自動拉長為流線型彗星光梭。
 
 ### 5. ⏱️ 時空膨脹控制與雙模式宇宙邊界 (Time Dilation & Dual Boundary Physics)
-* **保留動量的「子彈時間凍結（Bullet-Time Freeze）」**：支援 $0.1\times$ 超慢動作微距觀察至 $2.0\times$ 倍速演化（含摩擦阻尼指數時間補償 $\text{friction}^{\Delta t / \Delta t_0}$）。按下「凍結時間（$0.0\times$）」時跳過物理積分但完整保留粒子速度向量 $\vec{v}$，讓彗星尾跡與熱力發光完美定格於半空中，並允許在暫停狀態下即時調整粒子大小與拉伸倍率。
+* **保留動量的「子彈時間凍結（Bullet-Time Freeze）」**：支援 $0.1\times$ 超慢動作微距觀察至 $2.0\times$ 倍速演化（含摩擦阻尼指數時間補償 $\text{friction}^{\Delta t / \Delta t_0}$）。按下「凍結時間（ $0.0\times$ ）」時跳過物理積分但完整保留粒子速度向量 $\vec{v}$，讓彗星尾跡與熱力發光完美定格於半空中，並允許在暫停狀態下即時調整粒子大小與拉伸倍率。
 * **雙模式邊界切換**：支援一鍵切換 **「📦 彈性撈網邊界（Bounce）」** 與 **「♾️ 無縫環形穿越邊界（Toroidal Wrap-around）」**（含跨邊界最短環形距離計算）。
 
 ### 6. 🕳️ 天體中心奇點：星系吸積盤與黑洞雙極噴流 (Central Black Hole Singularity)
