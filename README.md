@@ -53,19 +53,6 @@
 ```mermaid
 ---
 title: "粒子模擬器系統核心主架構 (Particle Simulator System Overview)"
-config:
-  theme: base
-  themeVariables:
-    clusterBkg: "#F5F5F7"
-    clusterBorder: "#86868B"
-    titleColor: "#1D1D1F"
-    primaryTextColor: "#1D1D1F"
-    lineColor: "#424245"
-  flowchart:
-    curve: basis
-    nodeSpacing: 65
-    rankSpacing: 80
-    padding: 32
 ---
 flowchart TB
     %% 🍎 Apple HIG 高反差系統色票 (深色字體配高明度微霧面底色，確保絕對清晰)
@@ -121,19 +108,6 @@ flowchart TB
 ```mermaid
 ---
 title: "子圖 A - Metal 6階段平行運算管線 (Sub-diagram A - Metal 6-Stage GPGPU Pipeline)"
-config:
-  theme: base
-  themeVariables:
-    clusterBkg: "#F5F5F7"
-    clusterBorder: "#86868B"
-    titleColor: "#1D1D1F"
-    primaryTextColor: "#1D1D1F"
-    lineColor: "#424245"
-  flowchart:
-    curve: basis
-    nodeSpacing: 55
-    rankSpacing: 70
-    padding: 28
 ---
 flowchart TB
     %% 🍎 Apple HIG 高反差系統色票
@@ -178,19 +152,6 @@ flowchart TB
 ```mermaid
 ---
 title: "子圖 B - 控制台、空間感知與渲染引擎細節 (Sub-diagram B - UI, Spatial & Render Modules)"
-config:
-  theme: base
-  themeVariables:
-    clusterBkg: "#F5F5F7"
-    clusterBorder: "#86868B"
-    titleColor: "#1D1D1F"
-    primaryTextColor: "#1D1D1F"
-    lineColor: "#424245"
-  flowchart:
-    curve: basis
-    nodeSpacing: 55
-    rankSpacing: 70
-    padding: 28
 ---
 flowchart TB
     %% 🍎 Apple HIG 高反差系統色票
