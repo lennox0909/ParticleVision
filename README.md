@@ -15,8 +15,8 @@
 ## ✨ 核心特色總覽 (Key Features)
 
 ### 1. ⚡ 極致 GPGPU 零拷貝渲染管線 (Zero-Copy Metal Compute Pipeline)
-* **$32^3$ 三維空間網格雜湊（$32,768$ Cells）**：將傳統 $\mathcal{O}(N^2)$ 的粒子交互作用時間複雜度大幅降至 $\mathcal{O}(N)$，在 $3 \times 3 \times 3$ 鄰近網格內高速查表計算非對稱引力與斥力。
-* **`LowLevelMesh` 頂點緩衝區直寫**：每顆粒子由 $4$ 個頂點（$12$ 個索引）組成 3D 正四面體，每頂點嚴格對齊 **$32\text{ Bytes}$**（`position: float3` + `normal: float3`）。由 Metal Compute Shader（`updateMeshVertices`）直接在 GPU 記憶體內原地更新頂點與法向量，完全免除 CPU-GPU 每幀資料搬移瓶頸。
+* **$32^3$ 三維空間網格雜湊（ $32,768$ Cells）**：將傳統 $\mathcal{O}(N^2)$ 的粒子交互作用時間複雜度大幅降至 $\mathcal{O}(N)$，在 $3 \times 3 \times 3$ 鄰近網格內高速查表計算非對稱引力與斥力。
+* **`LowLevelMesh` 頂點緩衝區直寫**：每顆粒子由 $4$ 個頂點（ $12$ 個索引）組成 3D 正四面體，每頂點嚴格對齊 **$32\text{ Bytes}$**（`position: float3` + `normal: float3`）。由 Metal Compute Shader（`updateMeshVertices`）直接在 GPU 記憶體內原地更新頂點與法向量，完全免除 CPU-GPU 每幀資料搬移瓶頸。
 
 ### 2. 🧬 非對稱三維規則矩陣與生態系預設集 ($N \times N$ Rule Matrices & Ecosystem Presets)
 * **三組獨立 $N \times N$ 物理矩陣**：支援 $2$ 至 $8$ 種粒子種類（Types），可針對任意種類配對 $(A \to B)$ 獨立微調 **作用力（Forces, $[-1.0, +1.0]$）**、**最小排斥半徑（Min. Radius）** 與 **最大感知半徑（Max. Radius）**。
