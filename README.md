@@ -38,7 +38,7 @@
 
 ### 6. 🕳️ 天體中心奇點：星系吸積盤與黑洞雙極噴流 (Central Black Hole Singularity)
 * **🌌 星系吸積盤旋渦（Accretion Swirl）**：於盒子中心 $(0, 0, 0)$ 生成事件視界黑洞與青色光子環，驅動全場粒子向赤道面收攏並高速繞行。
-* **🕳️ 黑洞相對論性雙極噴流（Relativistic Polar Jets）**：將粒子自動分層為「水平赤道吸積盤種族」與「高能電漿噴流種族」，透過中央磁流體準直加速管道（Collimated Jet Channel）將吸入視界的粒子沿南北極（$\pm y$ 軸）化為兩道貫穿天地的白熱化彗星光柱高速噴射而出。
+* **🕳️ 黑洞相對論性雙極噴流（Relativistic Polar Jets）**：將粒子自動分層為「水平赤道吸積盤種族」與「高能電漿噴流種族」，透過中央磁流體準直加速管道（Collimated Jet Channel）將吸入視界的粒子沿南北極（ $\pm y$ 軸）化為兩道貫穿天地的白熱化彗星光柱高速噴射而出。
 
 ### 7. 🔊 程序化合成 3D 雙耳空間音效 (Procedural 3D Spatial Audio)
 * **$100\%$ 零外部音檔依賴**：啟動時由 `SpatialAudioManager` 即時以泛音列與振幅調變（AM）數學合成無縫循環音波，並透過 RealityKit `SpatialAudioComponent` 掛載於 3D 實體：
