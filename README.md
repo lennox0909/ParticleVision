@@ -14,7 +14,7 @@
 
 ## ✨ 核心特色總覽 (Key Features)
 
-### 1. ⚡ 極致 GPGPU 零拷貝渲染管線 (Zero-Copy Metal Compute Pipeline)
+### 1. ⚡ 極致 GPGPU 零拷貝渲染線程 (Zero-Copy Metal Compute Pipeline)
 * **$32^3$ 三維空間網格雜湊（ $32,768$ Cells）**：將傳統 $\mathcal{O}(N^2)$ 的粒子交互作用時間複雜度大幅降至 $\mathcal{O}(N)$，在 $3 \times 3 \times 3$ 鄰近網格內高速查表計算非對稱引力與斥力。
 * **`LowLevelMesh` 頂點緩衝區直寫**：每顆粒子由 $4$ 個頂點（ $12$ 個索引）組成 3D 正四面體，每頂點嚴格對齊 **$32\text{ Bytes}$**（`position: float3` + `normal: float3`）。由 Metal Compute Shader（`updateMeshVertices`）直接在 GPU 記憶體內原地更新頂點與法向量，完全免除 CPU-GPU 每幀資料搬移瓶頸。
 
@@ -47,7 +47,7 @@
 
 ---
 
-## 🏗️ 系統架構與 GPGPU 管線流程圖 (Architecture & Pipeline)
+## 🏗️ 系統架構與 GPGPU 流程圖 (Architecture & Pipeline)
 
 
 ```mermaid
@@ -76,7 +76,7 @@ flowchart TB
     end
 
     %% 獨立抽離之 GPGPU 模組節點
-    Metal_Mod[["⚡ Metal 6階段運算管線<br/>(Metal 6-Stage<br/>GPGPU Pipeline)<br/>🔍 詳見子圖 A"]]:::applePurple
+    Metal_Mod[["⚡ Metal 6階段運算線程<br/>(Metal 6-Stage<br/>GPGPU Pipeline)<br/>🔍 詳見子圖 A"]]:::applePurple
 
     %% 中間轉換動作節點 (保持連線淨空、消除反向拉扯)
     AudioSync(["聲學狀態同步<br/>(Audio State<br/>Sync)"]):::applePill
@@ -107,7 +107,7 @@ flowchart TB
 
 ```mermaid
 ---
-title: "子圖 A - Metal 6階段平行運算管線 (Sub-diagram A - Metal 6-Stage GPGPU Pipeline)"
+title: "子圖 A - Metal 6階段平行運算線程 (Sub-diagram A - Metal 6-Stage GPGPU Pipeline)"
 ---
 flowchart TB
     %% 🍎 Apple HIG 高反差系統色票
