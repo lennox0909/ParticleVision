@@ -140,8 +140,17 @@ struct ControlPanelView: View {
                 // ✨ 3. 中心引力奇點模式切換 (關閉 / 星系吸積旋渦 / 黑洞雙極噴流)
                 Picker("中心奇點", selection: $bindableSimulator.singularityMode) {
                     Text("關閉奇點").tag(0)
-                    Text("🌌 吸積盤旋渦").tag(1)
-                    Text("🕳️ 黑洞雙極噴流").tag(2)
+                    
+                    // 使用 HStack 組合 Image (透明圓球) 與 Text
+                    HStack {
+                        Image(systemName: "circle") // 代表透明的玻璃圓球
+                        Text("吸積盤旋渦")
+                    }.tag(1)
+                    
+                    HStack {
+                         Image(systemName: "circle") // 代表透明的玻璃圓球
+                         Text("黑洞雙極噴流")
+                    }.tag(2)
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)

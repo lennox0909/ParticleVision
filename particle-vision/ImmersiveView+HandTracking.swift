@@ -19,42 +19,6 @@ extension ImmersiveView {
         box.addChild(rightHandOrb)
     }
     
-    /// ✨ 初始化盒子正中央 (0, 0, 0) 的 3D 黑洞事件視界核心與外層光子環光暈
-    func setupSingularityOrb(in box: Entity) {
-        // 內層：深邃純黑的「事件視界核心 (Event Horizon)」
-        let coreMesh = MeshResource.generateSphere(radius: 0.11)
-        let blackHoleMat = UnlitMaterial(color: .black)
-        let coreEntity = ModelEntity(mesh: coreMesh, materials: [blackHoleMat])
-        
-        // 外層：半透明發光的「吸積光子環光暈 (Photon Ring Halo)」
-        let haloMesh = MeshResource.generateSphere(radius: 0.16)
-        let haloMat = UnlitMaterial(color: UIColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.35))
-        singularityOrb = ModelEntity(mesh: haloMesh, materials: [haloMat])
-        singularityOrb.addChild(coreEntity)
-        singularityOrb.position = SIMD3<Float>(0, 0, 0)
-        
-        box.addChild(singularityOrb)
-        updateSingularityVisual()
-    }
-    
-    /// ✨ 根據奇點模式 (0: 關閉, 1: 星系吸積旋渦, 2: 黑洞雙極噴流) 與強度動態更新 3D 中心奇點外觀
-    func updateSingularityVisual() {
-        guard simulator.singularityMode > 0 else {
-            singularityOrb.isEnabled = false
-            return
-        }
-        
-        singularityOrb.isEnabled = true
-        let scale = 0.75 + simulator.singularityStrength * 0.25
-        singularityOrb.scale = SIMD3<Float>(repeating: scale)
-        
-        // 模式 1 為青色星系引力光暈，模式 2 為紫紅高能黑洞視界光暈
-        let haloColor = simulator.singularityMode == 1
-        ? UIColor(red: 0.0, green: 0.88, blue: 1.0, alpha: 0.38)
-        : UIColor(red: 0.95, green: 0.20, blue: 0.85, alpha: 0.45)
-        singularityOrb.model?.materials = [UnlitMaterial(color: haloColor)]
-    }
-    
     /// ✨ 當透明盒子處於「🔒 鎖定觀察模式」時，將雙手食指尖轉換為盒子內部力場奇點
     func updateGodHandForceField() {
         // 若目前處於「🖐️ 允許操作透明盒子」模式，停用神之手力場與光球，避免搬移盒子時干擾粒子
