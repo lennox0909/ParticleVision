@@ -11,6 +11,27 @@ class ParticleSimulator {
     // ✨ 新增：使用者自訂儲存的宇宙快照清單與當前啟用的快照 ID
     var customPresets: [SimulationPreset] = []
     var activePresetID: UUID? = nil
+
+    /// 防止批次套用預設集時觸發多次 GPU Buffer 更新
+    var isBatchUpdating: Bool = false
+
+    var ruleMatrix: [Float] = [] {
+        didSet {
+            if !isBatchUpdating { updateRuleMatrixBuffer() }
+        }
+    }
+
+    var rMinMatrix: [Float] = [] {
+        didSet {
+            if !isBatchUpdating { updateRuleMatrixBuffer() }
+        }
+    }
+
+    var rMaxMatrix: [Float] = [] {
+        didSet {
+            if !isBatchUpdating { updateRuleMatrixBuffer() }
+        }
+    }
     
     // 集中管理左右兩個獨立視窗的開啟狀態
     var showColorWindow: Bool = false
@@ -161,17 +182,6 @@ class ParticleSimulator {
         }
     }
     
-    // 三組獨立的 N x N 矩陣：作用力、最小半徑、最大半徑
-    var ruleMatrix: [Float] = [] {
-        didSet { updateRuleMatrixBuffer() }
-    }
-    var rMinMatrix: [Float] = [] {
-        didSet { updateRuleMatrixBuffer() }
-    }
-    var rMaxMatrix: [Float] = [] {
-        didSet { updateRuleMatrixBuffer() }
-    }
-    
     // ✨ 新增：當前選中的色票 ID 與生成的顏色陣列 (預設為 1: Rainbow)
     var selectedPaletteID: Int = 1
     var currentColors: [Color] = []
@@ -205,9 +215,16 @@ class ParticleSimulator {
     
     func randomizeRules() {
         let matrixSize = numTypes * numTypes
+        
+        // ✨ 開啟批次更新標記，避免重複重建 Buffer
+        self.isBatchUpdating = true
+        
         self.rMinMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.010...0.045) }
         self.rMaxMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.060...0.125) }
         self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
+        
+        self.isBatchUpdating = false
+        self.updateRuleMatrixBuffer() // 統一寫入 GPU
     }
     
     func resetSimulation(newCount: Int, newTypes: Int) {
@@ -374,7 +391,6 @@ class ParticleSimulator {
         return currentColors[type % currentColors.count]
     }
     
-    
     // MARK: - 透明盒子空間狀態與外觀 (Position / Scale / Orientation / Edge Color & Thickness) 儲存與還原
     
     /// 從 UserDefaults 讀取上次儲存的盒子空間狀態與邊框設定
@@ -430,7 +446,4 @@ class ParticleSimulator {
             thickness: self.boxEdgeThickness
         )
     }
-    
-    
-    
 }

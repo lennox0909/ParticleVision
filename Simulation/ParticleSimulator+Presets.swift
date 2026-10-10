@@ -34,8 +34,12 @@ extension ParticleSimulator {
         // 1. 無論種類數是否相同，都重置宇宙粒子位置（讓粒子重新均勻洗牌，避免卡在舊結構死角）
         self.resetSimulation(newCount: self.particleCount, newTypes: preset.numTypes)
         
-        // 2. 將預設集的 N x N 矩陣覆蓋寫入 simulator（didSet 會自動呼叫 updateRuleMatrixBuffer 寫入 GPU）
+        // 2. 將預設集的 N x N 矩陣批次寫入 simulator，避免觸發多次 GPU Buffer 更新
         let expectedCount = preset.numTypes * preset.numTypes
+        
+        // ✨ 開啟批次更新標記，暫停 didSet 內的 GPU 更新
+        self.isBatchUpdating = true
+        
         if preset.ruleMatrix.count == expectedCount {
             self.ruleMatrix = preset.ruleMatrix
         }
@@ -45,6 +49,10 @@ extension ParticleSimulator {
         if preset.rMaxMatrix.count == expectedCount {
             self.rMaxMatrix = preset.rMaxMatrix
         }
+        
+        // ✨ 關閉批次更新標記，並手動觸發單次 GPU Buffer 寫入
+        self.isBatchUpdating = false
+        self.updateRuleMatrixBuffer()
     }
     
     /// ✨ 將目前的「矩陣規則 + 粒子種類 + 空間摩擦力 + 色票」儲存為自訂快照

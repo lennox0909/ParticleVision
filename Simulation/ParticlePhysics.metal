@@ -4,7 +4,7 @@ using namespace metal;
 
 kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
                                  device const Particle* particlesIn [[buffer(1)]],
-                                 constant float* ruleMatrix [[buffer(2)]],
+                                 constant float4* ruleMatrix [[buffer(2)]],
                                  constant SimParams& params [[buffer(3)]],
                                  device const Cell* grid [[buffer(4)]],
                                  constant float4* handForces [[buffer(5)]],
@@ -16,17 +16,27 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
     Particle p = particlesIn[id];
     float3 force = float3(0.0);
     uint3 cellCoords = getCellCoords(p.position);
-    
-    // 計算單一矩陣的大小 (N x N)，用於偏移讀取 rMin 與 rMax 矩陣
-    uint matrixSize = params.numTypes * params.numTypes;
-    
+
+
+    // ✨ 修正 1：將擾動種子計算移至迴圈上方，供後續解開重疊粒子使用
+    uint seed = id ^ as_type<uint>(p.velocity.x) ^ as_type<uint>(p.velocity.y) ^ as_type<uint>(p.velocity.z);
+    seed ^= seed >> 16;
+    seed *= 0x85ebca6b;
+    seed ^= seed >> 13;
+    seed *= 0xc2b2ae35;
+    seed ^= seed >> 16;
+
+    float rx = float(seed & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    float ry = float((seed >> 10) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    float rz = float((seed >> 20) & 0x3FF) / 1023.0 * 2.0 - 1.0;
+    float3 jitter = float3(rx, ry, rz);
+
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
                 int3 neighborCoords = int3(cellCoords) + int3(x, y, z);
                 
                 if (boundaryMode == 1) {
-                    // ♾️ 無縫環形宇宙模式：網格索引在 0 ~ 31 之間循環折返 (Modulo 32)
                     neighborCoords = (neighborCoords + 32) & 31;
                 } else {
                     if (neighborCoords.x < 0 || neighborCoords.x > 31 ||
@@ -47,52 +57,46 @@ kernel void computeGridParticles(device Particle* particlesOut [[buffer(0)]],
                     Particle other = particlesIn[otherId];
                     float3 d = p.position - other.position;
                     
-                    // ♾️ 若為無縫環形邊界，跨牆壁的兩顆粒子取最短環形距離 (盒寬 = 4.0)
                     if (boundaryMode == 1) {
                         if (d.x >  2.0f) d.x -= 4.0f; else if (d.x < -2.0f) d.x += 4.0f;
                         if (d.y >  2.0f) d.y -= 4.0f; else if (d.y < -2.0f) d.y += 4.0f;
                         if (d.z >  2.0f) d.z -= 4.0f; else if (d.z < -2.0f) d.z += 4.0f;
                     }
                     
-                    float r = fast::length(d);
+                    // ✨ 修正 2：改用標準 length 提升空間精度，避免 fast::length 的軸向對齊誤差
+                    float r = length(d);
                     
-                    // 根據 (主動粒子 p.type -> 目標粒子 other.type) 查表取得專屬的引力、最小半徑與最大半徑
+                    // ✨ 修正 3：防止粒子完全重疊 (r=0) 導致斥力失效，強制給予微擾推開
+                    if (r < 0.0001f) {
+                        d = normalize(jitter + 0.001f);
+                        r = 0.0001f;
+                    }
+                    
                     uint ruleIdx = p.type * params.numTypes + other.type;
-                    float rule = ruleMatrix[ruleIdx];
-                    float pairRMin = ruleMatrix[matrixSize + ruleIdx];
-                    float pairRMax = max(pairRMin + 0.001f, ruleMatrix[matrixSize * 2 + ruleIdx]);
+                    float4 ruleData = ruleMatrix[ruleIdx];
                     
-                    if (r > 0.0 && r < pairRMax) {
+                    float rule = ruleData.x;
+                    float pairRMin = ruleData.y;
+                    float pairRMax = max(pairRMin + 0.001f, ruleData.z);
+                    
+                    // ✨ 修正 4：移除原先的 r > 0.0 判斷，因為上方已提供 0.0001f 保底
+                    if (r < pairRMax) {
                         d /= r;
                         
                         if (r < pairRMin) {
                             force += d * (1.0f - r / pairRMin) * 2.0f;
                         } else {
                             float f = rule * (1.0f - abs(2.0f * r - pairRMax - pairRMin) / (pairRMax - pairRMin));
-                            force += d * f;
+                            force -= d * f;
                         }
                     }
                 }
             }
         }
     }
-    
-    // 1. 動態種子：利用 id 與「當前速度」混合，確保擾動方向每幀切換，打破靜態風場
-    uint seed = id ^ as_type<uint>(p.velocity.x) ^ as_type<uint>(p.velocity.y) ^ as_type<uint>(p.velocity.z);
-    
-    // 2. 高品質整數雜湊 (PCG Hash 變體)：確保分佈絕對均勻，消除特定方向的引力偏差
-    seed ^= seed >> 16;
-    seed *= 0x85ebca6b;
-    seed ^= seed >> 13;
-    seed *= 0xc2b2ae35;
-    seed ^= seed >> 16;
-    
-    // 3. 提取三個均勻分佈的浮點數，將範圍精確映射至 -1.0 ~ 1.0
-    float rx = float(seed & 0x3FF) / 1023.0 * 2.0 - 1.0;
-    float ry = float((seed >> 10) & 0x3FF) / 1023.0 * 2.0 - 1.0;
-    float rz = float((seed >> 20) & 0x3FF) / 1023.0 * 2.0 - 1.0;
-    
-    float3 jitter = float3(rx, ry, rz);
+
+    // 4. 套用微小擾動打破網格對稱性
+    force += jitter * 0.1f;
     
     // 4. 套用微小擾動打破網格對稱性
     force += jitter * 0.1f;

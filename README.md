@@ -15,8 +15,9 @@
 ## ✨ 核心特色總覽 (Key Features)
 
 ### 1. ⚡ 極致 GPGPU 零拷貝渲染線程 (Zero-Copy Metal Compute Pipeline)
-* **$32^3$ 三維空間網格雜湊（ $32,768$ Cells）**：將傳統 $\mathcal{O}(N^2)$ 的粒子交互作用時間複雜度大幅降至 $\mathcal{O}(N)$，在 $3 \times 3 \times 3$ 鄰近網格內高速查表計算非對稱引力與斥力。
-* **`LowLevelMesh` 頂點緩衝區直寫**：每顆粒子由 $4$ 個頂點（ $12$ 個索引）組成 3D 正四面體，每頂點嚴格對齊 **$32\text{ Bytes}$**（`position: float3` + `normal: float3`）。由 Metal Compute Shader（`updateMeshVertices`）直接在 GPU 記憶體內原地更新頂點與法向量，完全免除 CPU-GPU 每幀資料搬移瓶頸。
+* **$32^3$ 空間網格雜湊與記憶體連續化（Spatial Hashing & Reordering）**：將傳統 $\mathcal{O}(N^2)$ 的物理運算降至 $\mathcal{O}(N)$。不僅透過 $32,768$ 個網格進行空間分區，每幀更動態重排粒子資料緩衝區（Memory Reordering），確保空間相近的粒子在 GPU 實體記憶體中絕對連續，大幅降低 Cache Miss 率。
+* **`float4` 16-byte 對齊單次提取（Single-Fetch Optimization）**：將 $N \times N$ 物理規則矩陣（作用力、最小排斥半徑、最大感知半徑）交錯打包為嚴格對齊的 `SIMD4<Float>` 結構。在 $3 \times 3 \times 3$ 鄰近網格查表時，Compute Shader 只需執行單次記憶體提取即可載入完整參數，並內建零距離微擾防護（Zero-Distance Jitter），極致榨出 Metal 算力。
+* **`LowLevelMesh` 頂點緩衝區直寫（Zero-Copy Direct Write）**：每顆粒子由 $4$ 個頂點（$12$ 個索引）組成 3D 正四面體，頂點資料嚴格對齊 **$32\text{ Bytes}$**（`position: float3` + `normal: float3`）。善用 Apple Silicon 的 UMA 統一記憶體架構，由 Compute Shader（`updateMeshVertices`）原地直寫更新頂點與法向量，徹底消除 CPU-GPU 之間的每幀資料搬移瓶頸。
 
 ### 2. 🧬 非對稱三維規則矩陣與生態系預設集 ($N \times N$ Rule Matrices & Ecosystem Presets)
 * **三組獨立 $N \times N$ 物理矩陣**：支援 $2$ 至 $8$ 種粒子種類（Types），可針對任意種類配對 $(A \to B)$ 獨立微調 **作用力（Forces, $[-1.0, +1.0]$）**、**最小排斥半徑（Min. Radius）** 與 **最大感知半徑（Max. Radius）**。

@@ -144,7 +144,7 @@ extension ParticleSimulator {
         }
     }
     
-    /// ✨ 將 Forces、rMin、rMax 三個矩陣連續打包進同一個 Buffer 傳給 GPU
+    /// ✨ 將 Forces、rMin、rMax 三個矩陣交錯打包進同一個 Buffer (符合 GPU float4 的 16-byte 對齊)
     func updateRuleMatrixBuffer() {
         guard device != nil else { return }
         let matrixSize = numTypes * numTypes
@@ -152,16 +152,26 @@ extension ParticleSimulator {
               rMinMatrix.count == matrixSize,
               rMaxMatrix.count == matrixSize else { return }
         
-        let combined = ruleMatrix + rMinMatrix + rMaxMatrix
-        let byteSize = MemoryLayout<Float>.stride * combined.count
+        // ✨ 修正打包邏輯：交錯寫入 [rule, rMin, rMax, padding]
+        var packedData = [SIMD4<Float>](repeating: .zero, count: matrixSize)
+        for i in 0..<matrixSize {
+            packedData[i] = SIMD4<Float>(
+                ruleMatrix[i],
+                rMinMatrix[i],
+                rMaxMatrix[i],
+                0.0 // Padding
+            )
+        }
+        
+        let byteSize = MemoryLayout<SIMD4<Float>>.stride * packedData.count
         
         if let buffer = ruleMatrixBuffer, buffer.length == byteSize {
-            let ptr = buffer.contents().bindMemory(to: Float.self, capacity: combined.count)
-            for i in 0..<combined.count {
-                ptr[i] = combined[i]
+            let ptr = buffer.contents().bindMemory(to: SIMD4<Float>.self, capacity: packedData.count)
+            for i in 0..<packedData.count {
+                ptr[i] = packedData[i]
             }
         } else {
-            ruleMatrixBuffer = device.makeBuffer(bytes: combined, length: byteSize, options: .storageModeShared)
+            ruleMatrixBuffer = device.makeBuffer(bytes: packedData, length: byteSize, options: .storageModeShared)
         }
     }
     
