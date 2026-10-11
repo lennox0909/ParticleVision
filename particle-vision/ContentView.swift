@@ -3,8 +3,40 @@ import RealityKit
 
 struct ContentView: View {
     @Environment(ParticleSimulator.self) private var simulator
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
+    
+    var body: some View {
+        // ✨ 使用 TabView 來打造 visionOS 的原生左側邊欄
+        TabView {
+            // 頁籤 1：主控制台
+            MainDashboardView()
+                .tabItem {
+                    Label("控制台", systemImage: "sparkles")
+                }
+            
+            // 頁籤 2：顏色與熱力模式
+            ColorSchemeView()
+                .tabItem {
+                    Label("顏色主題", systemImage: "paintpalette.fill")
+                }
+            
+            // 頁籤 3：物理矩陣設定
+            RuleMatrixView()
+                .tabItem {
+                    Label("物理矩陣", systemImage: "grid")
+                }
+                
+            // ✨ 頁籤 4：系統環境設定 (新增)
+            SettingsView()
+                .tabItem {
+                    Label("環境設定", systemImage: "gearshape")
+                }
+        }
+    }
+}
+
+// ✨ 將您原本在 ContentView 中的 UI 原封不動地搬到這個新的 MainDashboardView 中
+struct MainDashboardView: View {
+    @Environment(ParticleSimulator.self) private var simulator
     
     var body: some View {
         @Bindable var bindableSim = simulator
@@ -22,7 +54,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // ✨ 3D 空間音效靜音切換膠囊按鈕（統一使用 Color 型別解決編譯器型別推斷問題）
+                // 3D 空間音效靜音切換膠囊按鈕
                 Button {
                     simulator.isAudioMuted.toggle()
                 } label: {
@@ -61,44 +93,9 @@ struct ContentView: View {
             }
             .padding(.top, 2)
             
-            // MARK: - 2. 獨立視窗開啟 / 關閉 + 手部互動模式控制列
-            HStack(spacing: 8) {
-                Toggle(isOn: $bindableSim.showColorWindow) {
-                    Label("Color Scheme", systemImage: "paintpalette.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 3)
-                }
-                .toggleStyle(.button)
-                .tint(.cyan)
-                .controlSize(.small)
-                .onChange(of: simulator.showColorWindow) { _, shouldOpen in
-                    if shouldOpen {
-                        openWindow(id: "ColorSchemeWindow")
-                    } else {
-                        dismissWindow(id: "ColorSchemeWindow")
-                    }
-                }
-                
-                Toggle(isOn: $bindableSim.showMatrixWindow) {
-                    Label("Matrix Settings", systemImage: "grid")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 3)
-                }
-                .toggleStyle(.button)
-                .tint(.cyan)
-                .controlSize(.small)
-                .onChange(of: simulator.showMatrixWindow) { _, shouldOpen in
-                    if shouldOpen {
-                        openWindow(id: "MatrixSettingsWindow")
-                    } else {
-                        dismissWindow(id: "MatrixSettingsWindow")
-                    }
-                }
-            }
+            // ✨ ✨ 注意：這裡移除了原本開啟獨立視窗的兩個 Toggle 按鈕！
             
-            // MARK: - 3. 透明盒子手部操作 vs 神之手力場切換橫幅
+            // MARK: - 2. 透明盒子手部操作 vs 神之手力場切換橫幅
             Button {
                 simulator.isBoxInteractionEnabled.toggle()
             } label: {
@@ -133,13 +130,17 @@ struct ContentView: View {
                 )
             }
             .buttonStyle(.plain)
+            .padding(.top, 8)
             
-            // MARK: - 4. 核心參數控制面板（宇宙規模 / 時空邊界 / 透明盒子外觀）
-            ControlPanelView()
+            // MARK: - 3. 核心參數控制面板（宇宙規模 / 時空邊界 / 透明盒子外觀）
+            ScrollView { // 加入 ScrollView 避免內容在視窗高度變化時被截斷
+                ControlPanelView()
+                    .padding(.bottom, 20)
+            }
             
             Spacer(minLength: 0)
             
-            // MARK: - 5. 底部 3D 空間啟動鈕（置中並保留底部呼吸空間）
+            // MARK: - 4. 底部 3D 空間啟動鈕
             HStack {
                 Spacer()
                 ToggleImmersiveSpaceButton()
@@ -150,16 +151,6 @@ struct ContentView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .onDisappear {
-            if simulator.showColorWindow {
-                dismissWindow(id: "ColorSchemeWindow")
-                simulator.showColorWindow = false
-            }
-            if simulator.showMatrixWindow {
-                dismissWindow(id: "MatrixSettingsWindow")
-                simulator.showMatrixWindow = false
-            }
-        }
     }
     
     private var fpsStatusColor: Color {

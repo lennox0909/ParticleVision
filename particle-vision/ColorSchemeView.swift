@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ColorSchemeView: View {
     @Environment(ParticleSimulator.self) private var simulator
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
     
     @State private var showHelpPopover: Bool = false
     @State private var selectedCategory: String = "All"
@@ -149,76 +147,6 @@ struct ColorSchemeView: View {
                         }
                     }
                 }
-                
-                Divider()
-                    .overlay(Color.white.opacity(0.15))
-                
-                // 控制項 1：粒子大小
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("粒子大小")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(String(format: "%.3f", simulator.particleScale))
-                            .font(.system(.caption, design: .monospaced).bold())
-                            .foregroundStyle(.secondary)
-                    }
-                    Slider(value: $bindableSimulator.particleScale, in: 0.005...0.050, step: 0.001)
-                        .controlSize(.small)
-                }
-                
-                // 控制項 2：流體速度拉伸 (Velocity Stretch)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Label("流體速度拉伸 (彗星尾跡)", systemImage: "wind")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(simulator.velocityStretch == 0 ? "關閉" : String(format: "%.1fx", simulator.velocityStretch))
-                            .font(.system(.caption, design: .monospaced).bold())
-                            .foregroundStyle(simulator.velocityStretch > 0 ? .orange : .secondary)
-                    }
-                    Slider(value: $bindableSimulator.velocityStretch, in: 0.0...5.0, step: 0.1)
-                        .tint(.orange)
-                        .controlSize(.small)
-                }
-                
-                // 控制項 3：螢光強度
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("螢光強度")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(String(format: "%.1f", simulator.glowIntensity))
-                            .font(.system(.caption, design: .monospaced).bold())
-                            .foregroundStyle(simulator.glowIntensity > 0 ? .cyan : .secondary)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Slider(value: $bindableSimulator.glowIntensity, in: 0...5, step: 0.1)
-                            .tint(.cyan)
-                            .controlSize(.small)
-                        
-                        Button {
-                            let next = max(0, simulator.glowIntensity - 0.1)
-                            simulator.glowIntensity = (next * 10).rounded() / 10
-                        } label: {
-                            Image(systemName: "minus")
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.mini)
-                        
-                        Button {
-                            let next = min(5, simulator.glowIntensity + 0.1)
-                            simulator.glowIntensity = (next * 10).rounded() / 10
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.mini)
-                    }
-                }
             }
             .padding(12)
             .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 14))
@@ -283,15 +211,6 @@ struct ColorSchemeView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .onAppear {
-            if !simulator.showColorWindow {
-                openWindow(id: "MainControlWindow")
-                dismissWindow(id: "ColorSchemeWindow")
-            }
-        }
-        .onDisappear {
-            simulator.showColorWindow = false
-        }
     }
     
     private var currentPalette: PaletteOption? {

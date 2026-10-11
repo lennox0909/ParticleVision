@@ -2,8 +2,6 @@ import SwiftUI
 
 struct RuleMatrixView: View {
     @Environment(ParticleSimulator.self) var simulator
-    @Environment(\.openWindow) var openWindow
-    @Environment(\.dismissWindow) var dismissWindow
     
     @State var selectedTab: MatrixTab = .forces
     @State var selection: MatrixSelection = .cell(row: 0, col: 0)
@@ -53,15 +51,6 @@ struct RuleMatrixView: View {
         }
         .onChange(of: count) { _, newCount in
             validateSelection(for: newCount)
-        }
-        .onAppear {
-            if !simulator.showMatrixWindow {
-                openWindow(id: "MainControlWindow")
-                dismissWindow(id: "MatrixSettingsWindow")
-            }
-        }
-        .onDisappear {
-            simulator.showMatrixWindow = false
         }
     }
 }

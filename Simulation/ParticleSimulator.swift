@@ -8,25 +8,33 @@ import SwiftUI
 
 @Observable
 class ParticleSimulator {
+    // ✨ 支援自動記憶存檔的深度專注模式開關
+    var isZenMode: Bool = UserDefaults.standard.object(forKey: "isZenMode") as? Bool ?? true {
+        didSet {
+            // 當開關被切換時，自動將最新狀態寫入裝置的持久化儲存中
+            UserDefaults.standard.set(isZenMode, forKey: "isZenMode")
+        }
+    }
+    
     // ✨ 新增：使用者自訂儲存的宇宙快照清單與當前啟用的快照 ID
     var customPresets: [SimulationPreset] = []
     var activePresetID: UUID? = nil
-
+    
     /// 防止批次套用預設集時觸發多次 GPU Buffer 更新
     var isBatchUpdating: Bool = false
-
+    
     var ruleMatrix: [Float] = [] {
         didSet {
             if !isBatchUpdating { updateRuleMatrixBuffer() }
         }
     }
-
+    
     var rMinMatrix: [Float] = [] {
         didSet {
             if !isBatchUpdating { updateRuleMatrixBuffer() }
         }
     }
-
+    
     var rMaxMatrix: [Float] = [] {
         didSet {
             if !isBatchUpdating { updateRuleMatrixBuffer() }
@@ -86,8 +94,30 @@ class ParticleSimulator {
         }
     }
     
-    // 👇 螢光強度的預設值在這裡 (範圍 0.0 ~ 5.0)
-    var glowIntensity: Float = 2.0
+    
+    // MARK: - 視覺與渲染參數 (支援 UserDefaults 記憶)
+    
+    // 1. 粒子大小
+    var particleScale: Float = UserDefaults.standard.object(forKey: "particleScale") as? Float ?? 0.005 {
+        didSet {
+            UserDefaults.standard.set(particleScale, forKey: "particleScale")
+        }
+    }
+    
+    // 2. 流體速度拉伸 (彗星尾跡)
+    var velocityStretch: Float = UserDefaults.standard.object(forKey: "velocityStretch") as? Float ?? 1.0 {
+        didSet {
+            UserDefaults.standard.set(velocityStretch, forKey: "velocityStretch")
+        }
+    }
+    
+    // 3. 螢光強度
+    var glowIntensity: Float = UserDefaults.standard.object(forKey: "glowIntensity") as? Float ?? 2.0 {
+        didSet {
+            UserDefaults.standard.set(glowIntensity, forKey: "glowIntensity")
+        }
+    }
+    
     var meshResource: MeshResource!
     var lowLevelMesh: LowLevelMesh?
     var updateMeshPipeline: MTLComputePipelineState!
@@ -117,12 +147,6 @@ class ParticleSimulator {
     private var lastFPSUpdateTime: TimeInterval = 0
     
     var needsVisualRebuild: Bool = false
-    
-    // 👇 粒子大小的預設值在這裡 (範圍 0.005 ~ 0.050) 只負責控制 3D 視覺外觀大小，與物理半徑完全解耦
-    var particleScale: Float = 0.005
-    
-    // ✨ 新增：動能流體拉伸強度 (0.0 = 維持原狀, 1.0 ~ 5.0 = 依速度向量自動拉長為彗星光梭)
-    var velocityStretch: Float = 1.0
     
     // ✨ 是否啟用「熱力能量著色模式 (Kinetic Heatmap Mode)」
     var isKineticColorMode: Bool = false
@@ -228,18 +252,34 @@ class ParticleSimulator {
     }
     
     func resetSimulation(newCount: Int, newTypes: Int) {
+        // 1. 套用環境參數 (粒子數量、種類數、時間流速)
         self.particleCount = newCount
         self.numTypes = newTypes
         
         self.params.particleCount = UInt32(newCount)
         self.params.numTypes = UInt32(newTypes)
-        self.params.friction = self.friction
-        self.params.dt = 0.016 * self.timeScale // ✨ 保持當前時間流速倍率
+        self.params.dt = 0.016 * self.timeScale // 保持當前時間流速倍率
         
-        // ✨ 當粒子種類數改變時，根據當前選中的色票重新生成對應數量的顏色
+        // 2. 解除目前的宇宙快照狀態
+        self.activePresetID = nil
+        
+        // ✨ 3. 隨機重置項目：色票 (Palette) 與 空間摩擦力 (Friction)
+        if let randomPalette = ColorPaletteGenerator.palettes.randomElement() {
+            self.selectedPaletteID = randomPalette.id
+        }
         self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: newTypes)
         
+        // 產生 0.30 到 0.95 之間的隨機摩擦力，並同步更新到參數緩衝區
+        self.friction = Float.random(in: 0.30...0.95)
+        self.params.friction = self.friction
+        
+        // 4. 重建 GPU 核心緩衝區
         setupBuffers()
+        
+        // 5. 隨機重置項目：引力與半徑矩陣 (Rule Matrix, Min/Max Radius)
+        self.randomizeRules()
+        
+        // 6. 標記需要重繪
         self.needsVisualRebuild = true
     }
     
