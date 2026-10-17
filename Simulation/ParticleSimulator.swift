@@ -6,209 +6,127 @@ import RealityKit
 import QuartzCore
 import SwiftUI
 
+// MARK: - 1. 系統與外觀設定 (SRP: System Settings)
 @Observable
-class ParticleSimulator {
-    // ✨ 支援自動記憶存檔的深度專注模式開關
+class SystemSettings {
     var isZenMode: Bool = UserDefaults.standard.object(forKey: "isZenMode") as? Bool ?? true {
-        didSet {
-            // 當開關被切換時，自動將最新狀態寫入裝置的持久化儲存中
-            UserDefaults.standard.set(isZenMode, forKey: "isZenMode")
-        }
+        didSet { UserDefaults.standard.set(isZenMode, forKey: "isZenMode") }
     }
-    
-    // ✨ 新增：使用者自訂儲存的宇宙快照清單與當前啟用的快照 ID
-    var customPresets: [SimulationPreset] = []
-    var activePresetID: UUID? = nil
-    
-    /// 防止批次套用預設集時觸發多次 GPU Buffer 更新
-    var isBatchUpdating: Bool = false
-    
-    var ruleMatrix: [Float] = [] {
-        didSet {
-            if !isBatchUpdating { updateRuleMatrixBuffer() }
-        }
+    var particleScale: Float = UserDefaults.standard.object(forKey: "particleScale") as? Float ?? 0.005 {
+        didSet { UserDefaults.standard.set(particleScale, forKey: "particleScale") }
     }
-    
-    var rMinMatrix: [Float] = [] {
-        didSet {
-            if !isBatchUpdating { updateRuleMatrixBuffer() }
-        }
+    var velocityStretch: Float = UserDefaults.standard.object(forKey: "velocityStretch") as? Float ?? 1.0 {
+        didSet { UserDefaults.standard.set(velocityStretch, forKey: "velocityStretch") }
     }
-    
-    var rMaxMatrix: [Float] = [] {
-        didSet {
-            if !isBatchUpdating { updateRuleMatrixBuffer() }
-        }
+    var glowIntensity: Float = UserDefaults.standard.object(forKey: "glowIntensity") as? Float ?? 2.0 {
+        didSet { UserDefaults.standard.set(glowIntensity, forKey: "glowIntensity") }
     }
+    var isAudioMuted: Bool = UserDefaults.standard.bool(forKey: "IsAudioMuted") {
+        didSet { UserDefaults.standard.set(isAudioMuted, forKey: "IsAudioMuted") }
+    }
+    var boxEdgeGrayscale: Float = 0.85 {
+        didSet { UserDefaults.standard.set(boxEdgeGrayscale, forKey: "BoxEdgeGrayscale") }
+    }
+    var boxEdgeThickness: Float = 0.012 {
+        didSet { UserDefaults.standard.set(boxEdgeThickness, forKey: "BoxEdgeThickness") }
+    }
+}
+
+// MARK: - 2. 物理與環境狀態 (SRP: Physics Environment)
+@Observable
+class PhysicsEnvironment {
+    @ObservationIgnored var onParamsChanged: (() -> Void)?
+    @ObservationIgnored var onMatrixChanged: (() -> Void)?
+    @ObservationIgnored var isBatchUpdating: Bool = false
     
-    // 集中管理左右兩個獨立視窗的開啟狀態
-    var showColorWindow: Bool = false
-    var showMatrixWindow: Bool = false
-    
-    // 是否允許手部對透明盒子進行拖曳、旋轉或縮放操作
-    var isBoxInteractionEnabled: Bool = true
-    
-    // ✨ 新增：空間時間控制 (暫停凍結 & 0.1x 慢動作 ~ 2.0x 倍速演化)
     var isPaused: Bool = false
-    var timeScale: Float = 1.0 {
-        didSet {
-            params.dt = 0.016 * timeScale
-            updateParamsBuffer()
-        }
-    }
-    
-    // ✨ 新增：引力中心奇點模式 (0 = 關閉, 1 = 🌌 星系吸積旋渦, 2 = 🕳️ 黑洞雙極噴流)
+    var isWrapBoundary: Bool = false
     var singularityMode: Int = 0
-    
-    // ✨ 新增：中心奇點引力強度 (0.2x 微弱引力核 ~ 3.0x 超大質量黑洞)
     var singularityStrength: Float = 1.2
     
-    // ✨ 新增：宇宙邊界物理模式 (false = 📦 彈性撈網邊界 Bounce, true = ♾️ 無縫週期穿越 Wrap-around)
-    var isWrapBoundary: Bool = false
-    
-    // ✨ 新增：3D 空間環境音效與指尖力場聲學回饋靜音開關
-    var isAudioMuted: Bool = UserDefaults.standard.bool(forKey: "IsAudioMuted") {
-        didSet {
-            UserDefaults.standard.set(isAudioMuted, forKey: "IsAudioMuted")
-        }
+    var timeScale: Float = 1.0 {
+        didSet { onParamsChanged?() }
+    }
+    var friction: Float = 0.65 {
+        didSet { onParamsChanged?() }
     }
     
-    // ✨ 左右手「神之手」力場資料 [左手, 右手]（加上 @ObservationIgnored 避免每幀觸發 UI 重繪與巨集歧義）
-    @ObservationIgnored
-    var handForces: [SIMD4<Float>] = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
-    
-    // 記憶透明盒子在 3D 空間中的座標、大小與旋轉角度
+    var ruleMatrix: [Float] = [] {
+        didSet { if !isBatchUpdating { onMatrixChanged?() } }
+    }
+    var rMinMatrix: [Float] = [] {
+        didSet { if !isBatchUpdating { onMatrixChanged?() } }
+    }
+    var rMaxMatrix: [Float] = [] {
+        didSet { if !isBatchUpdating { onMatrixChanged?() } }
+    }
+}
+
+// MARK: - 3. 空間與互動狀態 (SRP: Spatial Interaction)
+@Observable
+class SpatialInteraction {
+    var isBoxInteractionEnabled: Bool = true
     var boxPosition: SIMD3<Float> = SIMD3<Float>(0.4, 1.1, -0.7)
     var boxScale: SIMD3<Float> = SIMD3<Float>(repeating: 0.1)
     var boxOrientation: simd_quatf = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
     
-    // ✨ 新增：透明盒子邊框灰階顏色 (0.0 = 全黑, 0.5 = 灰階, 1.0 = 全白) 與粗細 (0.002 ~ 0.050)
-    var boxEdgeGrayscale: Float = 0.85 {
-        didSet {
-            UserDefaults.standard.set(boxEdgeGrayscale, forKey: "BoxEdgeGrayscale")
-        }
-    }
-    var boxEdgeThickness: Float = 0.012 {
-        didSet {
-            UserDefaults.standard.set(boxEdgeThickness, forKey: "BoxEdgeThickness")
-        }
-    }
+    @ObservationIgnored
+    var handForces: [SIMD4<Float>] = [SIMD4<Float>(repeating: 0), SIMD4<Float>(repeating: 0)]
+}
+
+// MARK: - 4. 視覺與色彩狀態 (SRP: Appearance State)
+@Observable
+class AppearanceState {
+    var showColorWindow: Bool = false
+    var showMatrixWindow: Bool = false
     
+    var isKineticColorMode: Bool = false
+    var typeKineticEnergies: [Float] = Array(repeating: 0.0, count: 8)
     
-    // MARK: - 視覺與渲染參數 (支援 UserDefaults 記憶)
+    var selectedPaletteID: Int = 1
+    var currentColors: [Color] = []
+}
+
+// MARK: - 5. 主引擎 Coordinator (CARP: Particle Simulator)
+@Observable
+class ParticleSimulator {
     
-    // 1. 粒子大小
-    var particleScale: Float = UserDefaults.standard.object(forKey: "particleScale") as? Float ?? 0.005 {
-        didSet {
-            UserDefaults.standard.set(particleScale, forKey: "particleScale")
-        }
-    }
+    // ✨ CARP：將不同職責的模組作為元件「組合」進來
+    var settings = SystemSettings()
+    var physics = PhysicsEnvironment()
+    var spatial = SpatialInteraction()
+    var appearance = AppearanceState()
     
-    // 2. 流體速度拉伸 (彗星尾跡)
-    var velocityStretch: Float = UserDefaults.standard.object(forKey: "velocityStretch") as? Float ?? 1.0 {
-        didSet {
-            UserDefaults.standard.set(velocityStretch, forKey: "velocityStretch")
-        }
-    }
+    // 全域宇宙快照狀態
+    var customPresets: [SimulationPreset] = []
+    var activePresetID: UUID? = nil
+    var needsVisualRebuild: Bool = false
     
-    // 3. 螢光強度
-    var glowIntensity: Float = UserDefaults.standard.object(forKey: "glowIntensity") as? Float ?? 2.0 {
-        didSet {
-            UserDefaults.standard.set(glowIntensity, forKey: "glowIntensity")
-        }
-    }
-    
-    var meshResource: MeshResource!
-    var lowLevelMesh: LowLevelMesh?
-    var updateMeshPipeline: MTLComputePipelineState!
-    
-    var device: MTLDevice!
-    var commandQueue: MTLCommandQueue!
-    
-    var clearGridPipeline: MTLComputePipelineState!
-    var countGridPipeline: MTLComputePipelineState!
-    var prefixSumPipeline: MTLComputePipelineState!
-    var reorderPipeline: MTLComputePipelineState!
-    var computeGridPipeline: MTLComputePipelineState!
-    
-    var particleBuffer: MTLBuffer!
-    var sortedParticleBuffer: MTLBuffer!
-    
-    var ruleMatrixBuffer: MTLBuffer!
-    var paramsBuffer: MTLBuffer!
-    var gridBuffer: MTLBuffer!
-    
-    var params: SimParams
+    // 內部基礎設定
     var particleCount: Int
     var numTypes: Int
+    var params: SimParams
     
     var currentFPS: Int = 0
     private var frameCount: Int = 0
     private var lastFPSUpdateTime: TimeInterval = 0
     
-    var needsVisualRebuild: Bool = false
-    
-    // ✨ 是否啟用「熱力能量著色模式 (Kinetic Heatmap Mode)」
-    var isKineticColorMode: Bool = false
-    
-    // ✨ 新增：各種類粒子的「即時真實動能測速值 (0.0 極冷靜止 ~ 1.0 極熱高速)」
-    var typeKineticEnergies: [Float] = Array(repeating: 0.0, count: 8)
-    
-    /// ✨ 從 GPU 共享的 particleBuffer 即時抽樣計算各種類粒子的真實運動速度
-    func updateLiveKineticEnergies() {
-        guard isKineticColorMode,
-              let buffer = particleBuffer,
-              numTypes > 0,
-              particleCount > 0 else { return }
-        
-        let ptr = buffer.contents().bindMemory(to: Particle.self, capacity: particleCount)
-        let particlesPerType = max(1, particleCount / numTypes)
-        let sampleCount = min(256, particlesPerType) // 每種粒子均勻抽樣 256 顆，耗時不到 0.05ms！
-        let step = max(1, particlesPerType / sampleCount)
-        
-        // 在此物理系統中，jitter 靜止微幅震動約為 0.015，高速追擊或神之手加速約為 0.18 ~ 0.45
-        let idleSpeedFloor: Float = 0.018
-        let maxRefSpeed: Float = 0.28
-        
-        var newEnergies = [Float](repeating: 0.0, count: numTypes)
-        
-        for t in 0..<numTypes {
-            let startIdx = t * particlesPerType
-            var totalSpeed: Float = 0.0
-            var count: Int = 0
-            
-            var idx = startIdx
-            let endIdx = min(particleCount, startIdx + particlesPerType)
-            while idx < endIdx {
-                let v = ptr[idx].velocity
-                totalSpeed += simd_length(v)
-                count += 1
-                idx += step
-            }
-            
-            let avgSpeed = count > 0 ? (totalSpeed / Float(count)) : 0.0
-            // 扣除基礎微擾動 (jitter)，將真實移動速度正規化至 0.0 (靜止深藍) ~ 1.0 (高速白熱紅)
-            let normalized = max(0.0, min(1.0, (avgSpeed - idleSpeedFloor) / (maxRefSpeed - idleSpeedFloor)))
-            
-            // 與上一幀進行指數平滑 (EMA)，讓顏色隨速度升溫/冷卻過渡極度絲滑不閃爍
-            let prev = t < typeKineticEnergies.count ? typeKineticEnergies[t] : 0.0
-            newEnergies[t] = prev * 0.82 + normalized * 0.18
-        }
-        
-        self.typeKineticEnergies = newEnergies
-    }
-    
-    // 空間摩擦力預設值
-    var friction: Float = 0.65 {
-        didSet {
-            params.friction = friction
-            updateParamsBuffer()
-        }
-    }
-    
-    // ✨ 新增：當前選中的色票 ID 與生成的顏色陣列 (預設為 1: Rainbow)
-    var selectedPaletteID: Int = 1
-    var currentColors: [Color] = []
+    // MARK: - Metal 與 GPU 資源
+    var meshResource: MeshResource!
+    var lowLevelMesh: LowLevelMesh?
+    var updateMeshPipeline: MTLComputePipelineState!
+    var device: MTLDevice!
+    var commandQueue: MTLCommandQueue!
+    var clearGridPipeline: MTLComputePipelineState!
+    var countGridPipeline: MTLComputePipelineState!
+    var prefixSumPipeline: MTLComputePipelineState!
+    var reorderPipeline: MTLComputePipelineState!
+    var computeGridPipeline: MTLComputePipelineState!
+    var particleBuffer: MTLBuffer!
+    var sortedParticleBuffer: MTLBuffer!
+    var ruleMatrixBuffer: MTLBuffer!
+    var paramsBuffer: MTLBuffer!
+    var gridBuffer: MTLBuffer!
     
     init(particleCount: Int = 50000, numTypes: Int = 6) {
         self.particleCount = particleCount
@@ -222,64 +140,99 @@ class ParticleSimulator {
             particleCount: UInt32(particleCount)
         )
         
-        // 初始化預設色票
-        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: numTypes)
+        // 註冊物理環境的回調事件，解耦 Metal API
+        self.physics.onParamsChanged = { [weak self] in
+            guard let self = self else { return }
+            self.params.dt = 0.016 * self.physics.timeScale
+            self.params.friction = self.physics.friction
+            self.updateParamsBuffer()
+        }
         
+        self.physics.onMatrixChanged = { [weak self] in
+            self?.updateRuleMatrixBuffer()
+        }
+        
+        // 初始化色票
+        self.appearance.currentColors = ColorPaletteGenerator.generateColors(optionID: appearance.selectedPaletteID, numTypes: numTypes)
+        
+        // 啟動 Metal 流程與讀取記憶狀態
         setupMetal()
         setupBuffers()
         loadBoxTransformFromDisk()
-        loadCustomPresetsFromDisk() // ✨ 載入使用者自訂快照
+        loadCustomPresetsFromDisk()
     }
     
-    /// ✨ 套用或重新生成指定的 Color Scheme
+    // MARK: - 核心邏輯橋接方法
+    
+    func updateLiveKineticEnergies() {
+        guard appearance.isKineticColorMode, let buffer = particleBuffer, numTypes > 0, particleCount > 0 else { return }
+        
+        let ptr = buffer.contents().bindMemory(to: Particle.self, capacity: particleCount)
+        let particlesPerType = max(1, particleCount / numTypes)
+        let sampleCount = min(256, particlesPerType)
+        let step = max(1, particlesPerType / sampleCount)
+        
+        let idleSpeedFloor: Float = 0.018
+        let maxRefSpeed: Float = 0.28
+        var newEnergies = [Float](repeating: 0.0, count: numTypes)
+        
+        for t in 0..<numTypes {
+            let startIdx = t * particlesPerType
+            var totalSpeed: Float = 0.0
+            var count: Int = 0
+            
+            var idx = startIdx
+            let endIdx = min(particleCount, startIdx + particlesPerType)
+            while idx < endIdx {
+                totalSpeed += simd_length(ptr[idx].velocity)
+                count += 1
+                idx += step
+            }
+            
+            let avgSpeed = count > 0 ? (totalSpeed / Float(count)) : 0.0
+            let normalized = max(0.0, min(1.0, (avgSpeed - idleSpeedFloor) / (maxRefSpeed - idleSpeedFloor)))
+            
+            let prev = t < appearance.typeKineticEnergies.count ? appearance.typeKineticEnergies[t] : 0.0
+            newEnergies[t] = prev * 0.82 + normalized * 0.18
+        }
+        
+        self.appearance.typeKineticEnergies = newEnergies
+    }
+    
     func applyPalette(id: Int) {
-        self.selectedPaletteID = id
-        self.currentColors = ColorPaletteGenerator.generateColors(optionID: id, numTypes: numTypes)
+        self.appearance.selectedPaletteID = id
+        self.appearance.currentColors = ColorPaletteGenerator.generateColors(optionID: id, numTypes: numTypes)
     }
     
     func randomizeRules() {
         let matrixSize = numTypes * numTypes
-        
-        // ✨ 開啟批次更新標記，避免重複重建 Buffer
-        self.isBatchUpdating = true
-        
-        self.rMinMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.010...0.045) }
-        self.rMaxMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.060...0.125) }
-        self.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
-        
-        self.isBatchUpdating = false
-        self.updateRuleMatrixBuffer() // 統一寫入 GPU
+        self.physics.isBatchUpdating = true
+        self.physics.rMinMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.010...0.045) }
+        self.physics.rMaxMatrix = (0..<matrixSize).map { _ in Float.random(in: 0.060...0.125) }
+        self.physics.ruleMatrix = (0..<matrixSize).map { _ in Float.random(in: -1...1) }
+        self.physics.isBatchUpdating = false
+        self.updateRuleMatrixBuffer()
     }
     
     func resetSimulation(newCount: Int, newTypes: Int) {
-        // 1. 套用環境參數 (粒子數量、種類數、時間流速)
         self.particleCount = newCount
         self.numTypes = newTypes
-        
         self.params.particleCount = UInt32(newCount)
         self.params.numTypes = UInt32(newTypes)
-        self.params.dt = 0.016 * self.timeScale // 保持當前時間流速倍率
+        self.params.dt = 0.016 * self.physics.timeScale
         
-        // 2. 解除目前的宇宙快照狀態
         self.activePresetID = nil
         
-        // ✨ 3. 隨機重置項目：色票 (Palette) 與 空間摩擦力 (Friction)
         if let randomPalette = ColorPaletteGenerator.palettes.randomElement() {
-            self.selectedPaletteID = randomPalette.id
+            self.appearance.selectedPaletteID = randomPalette.id
         }
-        self.currentColors = ColorPaletteGenerator.generateColors(optionID: selectedPaletteID, numTypes: newTypes)
+        self.appearance.currentColors = ColorPaletteGenerator.generateColors(optionID: self.appearance.selectedPaletteID, numTypes: newTypes)
         
-        // 產生 0.30 到 0.95 之間的隨機摩擦力，並同步更新到參數緩衝區
-        self.friction = Float.random(in: 0.30...0.95)
-        self.params.friction = self.friction
+        self.physics.friction = Float.random(in: 0.30...0.95)
+        self.params.friction = self.physics.friction
         
-        // 4. 重建 GPU 核心緩衝區
         setupBuffers()
-        
-        // 5. 隨機重置項目：引力與半徑矩陣 (Rule Matrix, Min/Max Radius)
         self.randomizeRules()
-        
-        // 6. 標記需要重繪
         self.needsVisualRebuild = true
     }
     
@@ -299,7 +252,6 @@ class ParticleSimulator {
         let relativeRotation = rotNew.inverse * rotOld
         
         let pointer = particleBuffer.contents().bindMemory(to: Particle.self, capacity: particleCount)
-        
         for i in 0..<particleCount {
             var p = pointer[i]
             let pos4 = SIMD4<Float>(p.position, 1.0)
@@ -313,7 +265,6 @@ class ParticleSimulator {
     func updateFPS() {
         let currentTime = CACurrentMediaTime()
         frameCount += 1
-        
         if currentTime - lastFPSUpdateTime >= 1.0 {
             DispatchQueue.main.async {
                 self.currentFPS = self.frameCount
@@ -323,142 +274,118 @@ class ParticleSimulator {
         }
     }
     
-    /// 重置 FPS 計數器（於關閉 3D 粒子空間時呼叫）
-    func resetFPS() {
-        currentFPS = 0
-        // 若你有定義 frameCount = 0 也一併在此歸零
-    }
+    func resetFPS() { currentFPS = 0 }
     
-    // MARK: - 1. Forces (引力矩陣) 控制 API
+    // MARK: - 矩陣存取與修改控制 API
     
     func getRule(from typeA: Int, to typeB: Int) -> Float {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < ruleMatrix.count else { return 0.0 }
-        return ruleMatrix[index]
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.ruleMatrix.count else { return 0.0 }
+        return physics.ruleMatrix[idx]
     }
-    
     func setRule(from typeA: Int, to typeB: Int, value: Float) {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < ruleMatrix.count else { return }
-        ruleMatrix[index] = value
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.ruleMatrix.count else { return }
+        physics.ruleMatrix[idx] = value
     }
-    
     func setRowRules(row: Int, value: Float) {
         guard row >= 0 && row < numTypes else { return }
-        var updated = ruleMatrix
+        var updated = physics.ruleMatrix
         for col in 0..<numTypes { updated[row * numTypes + col] = value }
-        ruleMatrix = updated
+        physics.ruleMatrix = updated
     }
-    
     func setColRules(col: Int, value: Float) {
         guard col >= 0 && col < numTypes else { return }
-        var updated = ruleMatrix
+        var updated = physics.ruleMatrix
         for row in 0..<numTypes { updated[row * numTypes + col] = value }
-        ruleMatrix = updated
+        physics.ruleMatrix = updated
     }
-    
     func setAllRules(value: Float = 0.0) {
-        self.ruleMatrix = Array(repeating: value, count: numTypes * numTypes)
+        self.physics.ruleMatrix = Array(repeating: value, count: numTypes * numTypes)
     }
-    
-    // MARK: - 2. Min. Radius (最小排斥半徑矩陣) 控制 API
     
     func getMinRadius(from typeA: Int, to typeB: Int) -> Float {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < rMinMatrix.count else { return 0.035 }
-        return rMinMatrix[index]
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.rMinMatrix.count else { return 0.035 }
+        return physics.rMinMatrix[idx]
     }
-    
     func setMinRadius(from typeA: Int, to typeB: Int, value: Float) {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < rMinMatrix.count else { return }
-        rMinMatrix[index] = value
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.rMinMatrix.count else { return }
+        physics.rMinMatrix[idx] = value
     }
-    
     func setRowMinRadius(row: Int, value: Float) {
         guard row >= 0 && row < numTypes else { return }
-        var updated = rMinMatrix
+        var updated = physics.rMinMatrix
         for col in 0..<numTypes { updated[row * numTypes + col] = value }
-        rMinMatrix = updated
+        physics.rMinMatrix = updated
     }
-    
     func setColMinRadius(col: Int, value: Float) {
         guard col >= 0 && col < numTypes else { return }
-        var updated = rMinMatrix
+        var updated = physics.rMinMatrix
         for row in 0..<numTypes { updated[row * numTypes + col] = value }
-        rMinMatrix = updated
+        physics.rMinMatrix = updated
     }
-    
     func setAllMinRadius(value: Float = 0.035) {
-        self.rMinMatrix = Array(repeating: value, count: numTypes * numTypes)
+        self.physics.rMinMatrix = Array(repeating: value, count: numTypes * numTypes)
     }
-    
-    // MARK: - 3. Max. Radius (最大感知半徑矩陣) 控制 API
     
     func getMaxRadius(from typeA: Int, to typeB: Int) -> Float {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < rMaxMatrix.count else { return 0.120 }
-        return rMaxMatrix[index]
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.rMaxMatrix.count else { return 0.120 }
+        return physics.rMaxMatrix[idx]
     }
-    
     func setMaxRadius(from typeA: Int, to typeB: Int, value: Float) {
-        let index = typeA * numTypes + typeB
-        guard index >= 0 && index < rMaxMatrix.count else { return }
-        rMaxMatrix[index] = value
+        let idx = typeA * numTypes + typeB
+        guard idx >= 0 && idx < physics.rMaxMatrix.count else { return }
+        physics.rMaxMatrix[idx] = value
     }
-    
     func setRowMaxRadius(row: Int, value: Float) {
         guard row >= 0 && row < numTypes else { return }
-        var updated = rMaxMatrix
+        var updated = physics.rMaxMatrix
         for col in 0..<numTypes { updated[row * numTypes + col] = value }
-        rMaxMatrix = updated
+        physics.rMaxMatrix = updated
     }
-    
     func setColMaxRadius(col: Int, value: Float) {
         guard col >= 0 && col < numTypes else { return }
-        var updated = rMaxMatrix
+        var updated = physics.rMaxMatrix
         for row in 0..<numTypes { updated[row * numTypes + col] = value }
-        rMaxMatrix = updated
+        physics.rMaxMatrix = updated
     }
-    
     func setAllMaxRadius(value: Float = 0.120) {
-        self.rMaxMatrix = Array(repeating: value, count: numTypes * numTypes)
+        self.physics.rMaxMatrix = Array(repeating: value, count: numTypes * numTypes)
     }
     
-    /// ✨ 取得對應粒子種類的代表色（直接回傳當前動態色票陣列的顏色）
     func colorForType(_ type: Int) -> Color {
-        guard !currentColors.isEmpty else { return .white }
-        return currentColors[type % currentColors.count]
+        guard !appearance.currentColors.isEmpty else { return .white }
+        return appearance.currentColors[type % appearance.currentColors.count]
     }
     
-    // MARK: - 透明盒子空間狀態與外觀 (Position / Scale / Orientation / Edge Color & Thickness) 儲存與還原
+    // MARK: - 儲存與還原
     
-    /// 從 UserDefaults 讀取上次儲存的盒子空間狀態與邊框設定
     func loadBoxTransformFromDisk() {
         if let savedScale = UserDefaults.standard.array(forKey: "BoxScale") as? [Float], savedScale.count == 3 {
-            self.boxScale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
+            self.spatial.boxScale = SIMD3<Float>(savedScale[0], savedScale[1], savedScale[2])
         }
         if let savedPos = UserDefaults.standard.array(forKey: "BoxPosition") as? [Float], savedPos.count == 3 {
-            self.boxPosition = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
+            self.spatial.boxPosition = SIMD3<Float>(savedPos[0], savedPos[1], savedPos[2])
         }
         if let savedRot = UserDefaults.standard.array(forKey: "BoxRotation") as? [Float], savedRot.count == 4 {
-            self.boxOrientation = simd_quatf(ix: savedRot[0], iy: savedRot[1], iz: savedRot[2], r: savedRot[3])
+            self.spatial.boxOrientation = simd_quatf(ix: savedRot[0], iy: savedRot[1], iz: savedRot[2], r: savedRot[3])
         }
         
-        // ✨ 讀取邊框灰階顏色與邊框粗細（若曾儲存過則還原）
         if UserDefaults.standard.object(forKey: "BoxEdgeGrayscale") != nil {
-            self.boxEdgeGrayscale = UserDefaults.standard.float(forKey: "BoxEdgeGrayscale")
+            self.settings.boxEdgeGrayscale = UserDefaults.standard.float(forKey: "BoxEdgeGrayscale")
         }
         if UserDefaults.standard.object(forKey: "BoxEdgeThickness") != nil {
-            self.boxEdgeThickness = UserDefaults.standard.float(forKey: "BoxEdgeThickness")
+            self.settings.boxEdgeThickness = UserDefaults.standard.float(forKey: "BoxEdgeThickness")
         }
     }
     
-    /// 即時記錄並儲存 containerBox 當前的空間座標、縮放大小、旋轉角度與邊框設定
     func saveBoxTransform(from box: Entity) {
-        self.boxPosition = box.position
-        self.boxScale = box.scale
-        self.boxOrientation = box.orientation
+        self.spatial.boxPosition = box.position
+        self.spatial.boxScale = box.scale
+        self.spatial.boxOrientation = box.orientation
         
         UserDefaults.standard.set([box.scale.x, box.scale.y, box.scale.z], forKey: "BoxScale")
         UserDefaults.standard.set([box.position.x, box.position.y, box.position.z], forKey: "BoxPosition")
@@ -469,21 +396,58 @@ class ParticleSimulator {
             box.orientation.vector.w
         ], forKey: "BoxRotation")
         
-        // ✨ 同步確保邊框顏色與粗細寫入磁碟
-        UserDefaults.standard.set(self.boxEdgeGrayscale, forKey: "BoxEdgeGrayscale")
-        UserDefaults.standard.set(self.boxEdgeThickness, forKey: "BoxEdgeThickness")
+        UserDefaults.standard.set(self.settings.boxEdgeGrayscale, forKey: "BoxEdgeGrayscale")
+        UserDefaults.standard.set(self.settings.boxEdgeThickness, forKey: "BoxEdgeThickness")
     }
     
-    /// 將記憶的空間狀態（大小、旋轉、座標）與邊框外觀一併套用至 containerBox
     func applySavedTransform(to box: Entity) {
-        box.scale = self.boxScale
-        box.orientation = self.boxOrientation
-        box.position = self.boxPosition
+        box.scale = self.spatial.boxScale
+        box.orientation = self.spatial.boxOrientation
+        box.position = self.spatial.boxPosition
         
-        // 同步套用記憶的邊框灰階顏色與粗細
         box.updateBoxEdgesAppearance(
-            grayscale: self.boxEdgeGrayscale,
-            thickness: self.boxEdgeThickness
+            grayscale: self.settings.boxEdgeGrayscale,
+            thickness: self.settings.boxEdgeThickness
         )
     }
+}
+
+// MARK: - 🚀 舊版 API 無痛相容層 (Facade)
+// 提供向下相容：讓 Extension 與尚未修改的 UI 能把 ParticleSimulator 當成以前那樣直接操作！
+extension ParticleSimulator {
+    // 映射 SystemSettings
+    var isZenMode: Bool { get { settings.isZenMode } set { settings.isZenMode = newValue } }
+    var particleScale: Float { get { settings.particleScale } set { settings.particleScale = newValue } }
+    var velocityStretch: Float { get { settings.velocityStretch } set { settings.velocityStretch = newValue } }
+    var glowIntensity: Float { get { settings.glowIntensity } set { settings.glowIntensity = newValue } }
+    var isAudioMuted: Bool { get { settings.isAudioMuted } set { settings.isAudioMuted = newValue } }
+    var boxEdgeGrayscale: Float { get { settings.boxEdgeGrayscale } set { settings.boxEdgeGrayscale = newValue } }
+    var boxEdgeThickness: Float { get { settings.boxEdgeThickness } set { settings.boxEdgeThickness = newValue } }
+    
+    // 映射 PhysicsEnvironment
+    var isPaused: Bool { get { physics.isPaused } set { physics.isPaused = newValue } }
+    var isWrapBoundary: Bool { get { physics.isWrapBoundary } set { physics.isWrapBoundary = newValue } }
+    var singularityMode: Int { get { physics.singularityMode } set { physics.singularityMode = newValue } }
+    var singularityStrength: Float { get { physics.singularityStrength } set { physics.singularityStrength = newValue } }
+    var timeScale: Float { get { physics.timeScale } set { physics.timeScale = newValue } }
+    var friction: Float { get { physics.friction } set { physics.friction = newValue } }
+    var ruleMatrix: [Float] { get { physics.ruleMatrix } set { physics.ruleMatrix = newValue } }
+    var rMinMatrix: [Float] { get { physics.rMinMatrix } set { physics.rMinMatrix = newValue } }
+    var rMaxMatrix: [Float] { get { physics.rMaxMatrix } set { physics.rMaxMatrix = newValue } }
+    var isBatchUpdating: Bool { get { physics.isBatchUpdating } set { physics.isBatchUpdating = newValue } }
+    
+    // 映射 SpatialInteraction
+    var isBoxInteractionEnabled: Bool { get { spatial.isBoxInteractionEnabled } set { spatial.isBoxInteractionEnabled = newValue } }
+    var boxPosition: SIMD3<Float> { get { spatial.boxPosition } set { spatial.boxPosition = newValue } }
+    var boxScale: SIMD3<Float> { get { spatial.boxScale } set { spatial.boxScale = newValue } }
+    var boxOrientation: simd_quatf { get { spatial.boxOrientation } set { spatial.boxOrientation = newValue } }
+    var handForces: [SIMD4<Float>] { get { spatial.handForces } set { spatial.handForces = newValue } }
+    
+    // 映射 AppearanceState
+    var showColorWindow: Bool { get { appearance.showColorWindow } set { appearance.showColorWindow = newValue } }
+    var showMatrixWindow: Bool { get { appearance.showMatrixWindow } set { appearance.showMatrixWindow = newValue } }
+    var isKineticColorMode: Bool { get { appearance.isKineticColorMode } set { appearance.isKineticColorMode = newValue } }
+    var typeKineticEnergies: [Float] { get { appearance.typeKineticEnergies } set { appearance.typeKineticEnergies = newValue } }
+    var selectedPaletteID: Int { get { appearance.selectedPaletteID } set { appearance.selectedPaletteID = newValue } }
+    var currentColors: [Color] { get { appearance.currentColors } set { appearance.currentColors = newValue } }
 }
